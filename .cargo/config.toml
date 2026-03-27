@@ -1,0 +1,46 @@
+# Cargo configuration for fortress-crypto-core
+# Optimized for cross-compilation to Android
+
+[build]
+# Use LLD linker for better compatibility
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.aarch64-linux-android]
+# ARM64 Android configuration
+ar = "llvm-ar"
+linker = "aarch64-linux-android-clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+    "-C", "target-feature=+crt-static",
+    "-C", "relocation-model=pic",
+]
+
+[target.armv7-linux-androideabi]
+# ARMv7 Android configuration
+ar = "llvm-ar"
+linker = "armv7a-linux-androideabi-clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+    "-C", "target-feature=+crt-static",
+    "-C", "relocation-model=pic",
+]
+
+[target.x86_64-linux-android]
+# x86_64 Android configuration
+ar = "llvm-ar"
+linker = "x86_64-linux-android-clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+    "-C", "target-feature=+crt-static",
+    "-C", "relocation-model=pic",
+]
+
+[target.i686-linux-android]
+# x86 Android configuration
+ar = "llvm-ar"
+linker = "i686-linux-android-clang"
+rustflags = [
+    "-C", "link-arg=-fuse-ld=lld",
+    "-C", "target-feature=+crt-static",
+    "-C", "relocation-model=pic",
+]
