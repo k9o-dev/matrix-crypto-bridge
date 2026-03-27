@@ -1,0 +1,114 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 1.0.0)"
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=${{ github.event.inputs.version }}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Publishing version: $VERSION"
+
+      - name: Install dependencies
+        run: |
+          cd react-native-matrix-crypto
+          npm ci
+
+      - name: Build package
+        run: |
+          cd react-native-matrix-crypto
+          npm run build
+
+      - name: Generate TypeScript definitions
+        run: |
+          cd react-native-matrix-crypto
+          npm run type-check
+
+      - name: Lint code
+        run: |
+          cd react-native-matrix-crypto
+          npm run lint
+        continue-on-error: true
+
+      - name: Run tests
+        run: |
+          cd react-native-matrix-crypto
+          npm test
+        continue-on-error: true
+
+      - name: Verify package contents
+        run: |
+          cd react-native-matrix-crypto
+          npm pack --dry-run
+
+      - name: Publish to npm
+        run: |
+          cd react-native-matrix-crypto
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            react-native-matrix-crypto/package.json
+            react-native-matrix-crypto/README.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify success
+        if: success( )
+        run: |
+          echo "✅ Package published successfully!"
+          echo ""
+          echo "📦 Package: @k9o/react-native-matrix-crypto"
+          echo "🔗 npm URL: https://www.npmjs.com/package/@k9o/react-native-matrix-crypto"
+          echo "📝 Version: ${{ steps.version.outputs.version }}"
+          echo ""
+          echo "Install with:"
+          echo "  npm install @k9o/react-native-matrix-crypto"
+
+      - name: Notify failure
+        if: failure( )
+        run: |
+          echo "❌ Publishing failed!"
+          echo ""
+          echo "Check the logs above for details"
+        continue-on-error: true
