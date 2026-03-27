@@ -1,0 +1,233 @@
+# Matrix Crypto Bridge - GitLab CI/CD Pipeline
+# Builds Android AAR and iOS XCFramework
+
+stages:
+  - build
+  - package
+  - release
+
+variables:
+  RUST_BACKTRACE: "1"
+  CARGO_TERM_COLOR: "always"
+
+# Android Build Job
+build:android:
+  stage: build
+  image: ubuntu:22.04
+  
+  variables:
+    ANDROID_NDK_VERSION: "27.1.12297006"
+    JAVA_HOME: "/usr/lib/jvm/java-17-temurin"
+  
+  before_script:
+    # Update package manager
+    - apt-get update -qq
+    - apt-get install -y -qq curl wget git build-essential pkg-config
+    
+    # Install Rust
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    - source $HOME/.cargo/env
+    - rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+    
+    # Install Java
+    - apt-get install -y -qq openjdk-17-jdk-headless
+    
+    # Install Android SDK/NDK
+    - apt-get install -y -qq android-sdk
+    - export ANDROID_SDK_ROOT=/usr/lib/android-sdk
+    - export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION
+    
+    # Install uniffi-bindgen
+    - cargo install uniffi --features=cli
+  
+  script:
+    # Build Rust for Android
+    - echo "Building Rust for Android..."
+    - chmod +x ./build-scripts/build-android.sh
+    - ./build-scripts/build-android.sh
+    
+    # Build Android AAR
+    - echo "Building Android AAR..."
+    - cd matrix-crypto-android
+    - chmod +x ./gradlew
+    - ./gradlew build
+    - cd ..
+  
+  artifacts:
+    paths:
+      - matrix-crypto-android/build/outputs/aar/
+      - matrix-crypto-android/generated/
+    expire_in: 30 days
+    when: always
+  
+  cache:
+    paths:
+      - .cargo/
+      - target/
+      - matrix-crypto-android/.gradle/
+    key:
+      files:
+        - Cargo.lock
+        - matrix-crypto-android/build.gradle
+  
+  only:
+    - branches
+    - tags
+    - merge_requests
+  
+  tags:
+    - linux
+    - docker
+
+# iOS Build Job
+build:ios:
+  stage: build
+  image: macos-12
+  
+  variables:
+    RUST_BACKTRACE: "1"
+  
+  before_script:
+    # Install Rust
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    - source $HOME/.cargo/env
+    - rustup target add aarch64-apple-ios x86_64-apple-ios
+    
+    # Install uniffi-bindgen
+    - cargo install uniffi --features=cli
+  
+  script:
+    # Build Rust for iOS
+    - echo "Building Rust for iOS..."
+    - chmod +x ./build-scripts/build-ios.sh
+    - ./build-scripts/build-ios.sh
+  
+  artifacts:
+    paths:
+      - matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/
+      - matrix-crypto-ios/generated/
+    expire_in: 30 days
+    when: always
+  
+  cache:
+    paths:
+      - .cargo/
+      - target/
+    key:
+      files:
+        - Cargo.lock
+  
+  only:
+    - branches
+    - tags
+    - merge_requests
+  
+  tags:
+    - macos
+    - xcode
+
+# Package Job - Combine artifacts
+package:artifacts:
+  stage: package
+  image: ubuntu:22.04
+  
+  dependencies:
+    - build:android
+    - build:ios
+  
+  script:
+    - echo "Packaging build artifacts..."
+    - mkdir -p artifacts/android artifacts/ios
+    - cp -r matrix-crypto-android/build/outputs/aar/* artifacts/android/ || true
+    - cp -r matrix-crypto-ios/build/MatrixCryptoBridge.xcframework artifacts/ios/ || true
+    - echo "Artifacts packaged successfully"
+    - ls -lah artifacts/
+  
+  artifacts:
+    paths:
+      - artifacts/
+    expire_in: 90 days
+  
+  only:
+    - tags
+    - main
+    - master
+
+# Release Job - Create GitLab release with artifacts
+release:artifacts:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  
+  dependencies:
+    - build:android
+    - build:ios
+  
+  script:
+    - echo "Creating GitLab release for $CI_COMMIT_TAG"
+  
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: "Release $CI_COMMIT_TAG"
+    description: "Build artifacts for $CI_COMMIT_TAG\n\n## Artifacts\n- Android AAR (Release and Debug)\n- iOS XCFramework\n- Language bindings (Kotlin and Swift)"
+    assets:
+      links:
+        - name: "Android AAR (Release)"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-android/build/outputs/aar/matrix-crypto-android-release.aar"
+          link_type: other
+        - name: "Android AAR (Debug)"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-android/build/outputs/aar/matrix-crypto-android-debug.aar"
+          link_type: other
+        - name: "iOS XCFramework"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-ios/build/MatrixCryptoBridge.xcframework"
+          link_type: other
+  
+  only:
+    - tags
+  
+  tags:
+    - linux
+    - docker
+
+# Scheduled Build Job
+build:scheduled:
+  stage: build
+  image: ubuntu:22.04
+  
+  variables:
+    ANDROID_NDK_VERSION: "27.1.12297006"
+  
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq curl wget git build-essential pkg-config
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    - source $HOME/.cargo/env
+    - rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+    - apt-get install -y -qq openjdk-17-jdk-headless android-sdk
+    - export ANDROID_SDK_ROOT=/usr/lib/android-sdk
+    - export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION
+    - cargo install uniffi --features=cli
+  
+  script:
+    - echo "Running scheduled build..."
+    - chmod +x ./build-scripts/build-android.sh
+    - ./build-scripts/build-android.sh
+  
+  artifacts:
+    paths:
+      - matrix-crypto-android/build/outputs/aar/
+      - matrix-crypto-android/generated/
+    expire_in: 30 days
+    when: always
+  
+  cache:
+    paths:
+      - .cargo/
+      - target/
+      - matrix-crypto-android/.gradle/
+  
+  only:
+    - schedules
+  
+  tags:
+    - linux
+    - docker
