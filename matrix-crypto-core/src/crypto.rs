@@ -3,6 +3,8 @@ use crate::error::CryptoError;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 
 /// Main Matrix crypto machine
 pub struct MatrixCrypto {
@@ -198,7 +200,7 @@ impl MatrixCrypto {
         // In production, this would use the actual matrix-sdk-crypto
         Ok(format!(
             r#"{{"algorithm":"m.megolm.v1.aes-sha2","ciphertext":"{}","device_id":"{}","sender_key":"{}","session_id":"{}"}}"#,
-            base64::encode(&content),
+            STANDARD.encode(&content),
             self.device_id,
             self.device_fingerprint,
             Uuid::new_v4()

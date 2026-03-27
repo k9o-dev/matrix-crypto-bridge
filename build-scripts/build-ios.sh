@@ -87,15 +87,17 @@ echo -e "${GREEN}✓ Generated Swift bindings${NC}"
 echo ""
 echo -e "${YELLOW}Creating universal library...${NC}"
 
-DEVICE_LIB="$RUST_DIR/target/aarch64-apple-ios/release/libmatrix_crypto_core.a"
-SIMULATOR_LIB="$RUST_DIR/target/x86_64-apple-ios/release/libmatrix_crypto_core.a"
+# Use the workspace target directory (one level up from matrix-crypto-core)
+WORKSPACE_TARGET="$PROJECT_ROOT/target"
+DEVICE_LIB="$WORKSPACE_TARGET/aarch64-apple-ios/release/libmatrix_crypto_core.a"
+SIMULATOR_LIB="$WORKSPACE_TARGET/x86_64-apple-ios/release/libmatrix_crypto_core.a"
 UNIVERSAL_LIB="$BUILD_DIR/libmatrix_crypto_core.a"
 
 echo "Looking for device library: $DEVICE_LIB"
 if [ ! -f "$DEVICE_LIB" ]; then
     echo -e "${RED}✗ Device library not found: $DEVICE_LIB${NC}"
     echo "Available files in target/aarch64-apple-ios/release/:"
-    ls -la "$RUST_DIR/target/aarch64-apple-ios/release/" 2>/dev/null || echo "Directory not found"
+    ls -la "$WORKSPACE_TARGET/aarch64-apple-ios/release/" 2>/dev/null || echo "Directory not found"
     exit 1
 fi
 
@@ -103,7 +105,7 @@ echo "Looking for simulator library: $SIMULATOR_LIB"
 if [ ! -f "$SIMULATOR_LIB" ]; then
     echo -e "${RED}✗ Simulator library not found: $SIMULATOR_LIB${NC}"
     echo "Available files in target/x86_64-apple-ios/release/:"
-    ls -la "$RUST_DIR/target/x86_64-apple-ios/release/" 2>/dev/null || echo "Directory not found"
+    ls -la "$WORKSPACE_TARGET/x86_64-apple-ios/release/" 2>/dev/null || echo "Directory not found"
     exit 1
 fi
 
@@ -114,7 +116,7 @@ echo "  Simulator: $SIMULATOR_LIB"
 lipo -create "$DEVICE_LIB" "$SIMULATOR_LIB" -output "$UNIVERSAL_LIB"
 echo -e "${GREEN}✓ Created universal library: $UNIVERSAL_LIB${NC}"
 
-# Create XCFramework
+# Create XCFramework using xcodebuild
 echo ""
 echo -e "${YELLOW}Creating XCFramework...${NC}"
 
@@ -125,37 +127,22 @@ if [ -d "$XCFRAMEWORK_PATH" ]; then
     rm -rf "$XCFRAMEWORK_PATH"
 fi
 
-# Create framework directories
-FRAMEWORK_DIR_DEVICE="$BUILD_DIR/MatrixCryptoBridge-device.framework"
-FRAMEWORK_DIR_SIMULATOR="$BUILD_DIR/MatrixCryptoBridge-simulator.framework"
+# Create temporary framework directories for xcodebuild
+TEMP_FRAMEWORK_DEVICE="$BUILD_DIR/temp/MatrixCryptoBridge-device.framework"
+TEMP_FRAMEWORK_SIMULATOR="$BUILD_DIR/temp/MatrixCryptoBridge-simulator.framework"
 
-mkdir -p "$FRAMEWORK_DIR_DEVICE/Headers"
-mkdir -p "$FRAMEWORK_DIR_SIMULATOR/Headers"
+mkdir -p "$BUILD_DIR/temp"
+mkdir -p "$TEMP_FRAMEWORK_DEVICE/Headers"
+mkdir -p "$TEMP_FRAMEWORK_SIMULATOR/Headers"
 
-# Copy libraries
-cp "$DEVICE_LIB" "$FRAMEWORK_DIR_DEVICE/MatrixCryptoBridge"
-cp "$SIMULATOR_LIB" "$FRAMEWORK_DIR_SIMULATOR/MatrixCryptoBridge"
+# Copy device library
+cp "$DEVICE_LIB" "$TEMP_FRAMEWORK_DEVICE/MatrixCryptoBridge"
 
-# Create module maps
-mkdir -p "$FRAMEWORK_DIR_DEVICE/Modules"
-mkdir -p "$FRAMEWORK_DIR_SIMULATOR/Modules"
+# Copy simulator library
+cp "$SIMULATOR_LIB" "$TEMP_FRAMEWORK_SIMULATOR/MatrixCryptoBridge"
 
-cat > "$FRAMEWORK_DIR_DEVICE/Modules/module.modulemap" << 'EOF'
-framework module MatrixCryptoBridge {
-    header "MatrixCryptoBridge.h"
-    export *
-}
-EOF
-
-cat > "$FRAMEWORK_DIR_SIMULATOR/Modules/module.modulemap" << 'EOF'
-framework module MatrixCryptoBridge {
-    header "MatrixCryptoBridge.h"
-    export *
-}
-EOF
-
-# Create Info.plist files
-cat > "$FRAMEWORK_DIR_DEVICE/Info.plist" << 'EOF'
+# Create Info.plist for device framework
+cat > "$TEMP_FRAMEWORK_DEVICE/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -176,30 +163,55 @@ cat > "$FRAMEWORK_DIR_DEVICE/Info.plist" << 'EOF'
     <string>0.1.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>MinimumOSVersion</key>
+    <string>12.0</string>
 </dict>
 </plist>
 EOF
 
-cp "$FRAMEWORK_DIR_DEVICE/Info.plist" "$FRAMEWORK_DIR_SIMULATOR/Info.plist"
+# Create Info.plist for simulator framework
+cp "$TEMP_FRAMEWORK_DEVICE/Info.plist" "$TEMP_FRAMEWORK_SIMULATOR/Info.plist"
+
+# Create module.modulemap for both frameworks
+mkdir -p "$TEMP_FRAMEWORK_DEVICE/Modules"
+mkdir -p "$TEMP_FRAMEWORK_SIMULATOR/Modules"
+
+cat > "$TEMP_FRAMEWORK_DEVICE/Modules/module.modulemap" << 'EOF'
+framework module MatrixCryptoBridge {
+    umbrella header "MatrixCryptoBridge.h"
+    export *
+    module * { export * }
+}
+EOF
+
+cp "$TEMP_FRAMEWORK_DEVICE/Modules/module.modulemap" "$TEMP_FRAMEWORK_SIMULATOR/Modules/module.modulemap"
+
+# Create empty header files
+touch "$TEMP_FRAMEWORK_DEVICE/Headers/MatrixCryptoBridge.h"
+touch "$TEMP_FRAMEWORK_SIMULATOR/Headers/MatrixCryptoBridge.h"
 
 # Create XCFramework
 if ! xcodebuild -create-xcframework \
-    -framework "$FRAMEWORK_DIR_DEVICE" \
-    -framework "$FRAMEWORK_DIR_SIMULATOR" \
+    -framework "$TEMP_FRAMEWORK_DEVICE" \
+    -framework "$TEMP_FRAMEWORK_SIMULATOR" \
     -output "$XCFRAMEWORK_PATH"; then
     echo -e "${RED}✗ Failed to create XCFramework${NC}"
+    echo "Cleaning up temporary files..."
+    rm -rf "$BUILD_DIR/temp"
     exit 1
 fi
 
-if [ -d "$XCFRAMEWORK_PATH" ]; then
-    echo -e "${GREEN}✓ Created XCFramework${NC}"
-else
-    echo -e "${RED}✗ Failed to create XCFramework${NC}"
+# Verify XCFramework was created
+if [ ! -d "$XCFRAMEWORK_PATH" ]; then
+    echo -e "${RED}✗ XCFramework not found at: $XCFRAMEWORK_PATH${NC}"
+    rm -rf "$BUILD_DIR/temp"
     exit 1
 fi
+
+echo -e "${GREEN}✓ Created XCFramework${NC}"
 
 # Cleanup temporary frameworks
-rm -rf "$FRAMEWORK_DIR_DEVICE" "$FRAMEWORK_DIR_SIMULATOR"
+rm -rf "$BUILD_DIR/temp"
 
 echo ""
 echo -e "${GREEN}✓ iOS build complete!${NC}"
