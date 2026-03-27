@@ -82,7 +82,7 @@ echo -e "${GREEN}✓ Host platform: $HOST_PLATFORM${NC}"
 echo ""
 echo -e "${YELLOW}Installing Android Rust targets...${NC}"
 
-ANDROID_TARGETS=("aarch64-linux-android" "armv7-linux-android" "x86_64-linux-android")
+ANDROID_TARGETS=("aarch64-linux-android" "armv7-linux-androideabi" "x86_64-linux-android")
 
 for target in "${ANDROID_TARGETS[@]}"; do
     if ! rustup target list | grep -q "^$target (installed)"; then
@@ -132,7 +132,7 @@ build_android_target() {
 
 # Build for each target
 build_android_target "aarch64-linux-android" "aarch64" || exit 1
-build_android_target "armv7-linux-android" "armv7a" || exit 1
+build_android_target "armv7-linux-androideabi" "armv7a" || exit 1
 build_android_target "x86_64-linux-android" "x86_64" || exit 1
 
 # Generate Kotlin bindings
@@ -161,7 +161,7 @@ mkdir -p "$ANDROID_DIR/src/main/jniLibs/x86_64"
 cp "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" \
    "$ANDROID_DIR/src/main/jniLibs/arm64-v8a/" 2>/dev/null || true
 
-cp "$RUST_DIR/target/armv7-linux-android/release/libmatrix_crypto_core.so" \
+cp "$RUST_DIR/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
    "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a/" 2>/dev/null || true
 
 cp "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.so" \

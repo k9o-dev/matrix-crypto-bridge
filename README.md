@@ -81,7 +81,7 @@ cd matrix-crypto-bridge
 rustup target add aarch64-apple-ios x86_64-apple-ios
 
 # Android targets (works on macOS, Linux, and Windows)
-rustup target add aarch64-linux-android armv7-linux-android x86_64-linux-android
+rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 
 # Install UniFFI with CLI support
 cargo install uniffi --features=cli
