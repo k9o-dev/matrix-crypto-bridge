@@ -141,7 +141,7 @@ echo -e "${YELLOW}Generating Kotlin bindings...${NC}"
 
 if command -v uniffi-bindgen &> /dev/null; then
     uniffi-bindgen generate \
-        "$RUST_DIR/src/lib.rs" \
+        "$RUST_DIR/src/matrix_crypto.udl" \
         --language kotlin \
         --out-dir "$ANDROID_DIR/generated" \
         2>&1 | grep -E "Generating|error" || true
@@ -158,13 +158,13 @@ mkdir -p "$ANDROID_DIR/src/main/jniLibs/arm64-v8a"
 mkdir -p "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a"
 mkdir -p "$ANDROID_DIR/src/main/jniLibs/x86_64"
 
-cp "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.a" \
+cp "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" \
    "$ANDROID_DIR/src/main/jniLibs/arm64-v8a/" 2>/dev/null || true
 
-cp "$RUST_DIR/target/armv7-linux-android/release/libmatrix_crypto_core.a" \
+cp "$RUST_DIR/target/armv7-linux-android/release/libmatrix_crypto_core.so" \
    "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a/" 2>/dev/null || true
 
-cp "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.a" \
+cp "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.so" \
    "$ANDROID_DIR/src/main/jniLibs/x86_64/" 2>/dev/null || true
 
 echo -e "${GREEN}✓ Copied libraries${NC}"

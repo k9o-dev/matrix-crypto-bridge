@@ -17,6 +17,7 @@ BUILD_DIR="$IOS_DIR/build"
 
 echo -e "${GREEN}Matrix Crypto Bridge - iOS Build Script${NC}"
 echo "Project root: $PROJECT_ROOT"
+echo "Rust dir: $RUST_DIR"
 echo ""
 
 # Check if Xcode is installed
@@ -53,10 +54,19 @@ echo -e "${YELLOW}Building Rust for iOS...${NC}"
 cd "$RUST_DIR"
 
 echo "Building for aarch64-apple-ios (device)..."
-cargo build --release --target aarch64-apple-ios 2>&1 | grep -E "Compiling|Finished|error" || true
+if ! cargo build --release --target aarch64-apple-ios; then
+    echo -e "${RED}✗ Failed to build for aarch64-apple-ios${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Built for aarch64-apple-ios${NC}"
 
+echo ""
 echo "Building for x86_64-apple-ios (simulator)..."
-cargo build --release --target x86_64-apple-ios 2>&1 | grep -E "Compiling|Finished|error" || true
+if ! cargo build --release --target x86_64-apple-ios; then
+    echo -e "${RED}✗ Failed to build for x86_64-apple-ios${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Built for x86_64-apple-ios${NC}"
 
 # Create build directory
 mkdir -p "$BUILD_DIR"
@@ -64,11 +74,14 @@ mkdir -p "$BUILD_DIR"
 # Generate Swift bindings
 echo ""
 echo -e "${YELLOW}Generating Swift bindings...${NC}"
-uniffi-bindgen generate \
-    "$RUST_DIR/src/lib.rs" \
+if ! uniffi-bindgen generate \
+    "$RUST_DIR/src/matrix_crypto.udl" \
     --language swift \
-    --out-dir "$IOS_DIR/generated" \
-    2>&1 | grep -E "Generating|error" || true
+    --out-dir "$IOS_DIR/generated"; then
+    echo -e "${RED}✗ Failed to generate Swift bindings${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Generated Swift bindings${NC}"
 
 # Create universal library (lipo)
 echo ""
@@ -78,13 +91,28 @@ DEVICE_LIB="$RUST_DIR/target/aarch64-apple-ios/release/libmatrix_crypto_core.a"
 SIMULATOR_LIB="$RUST_DIR/target/x86_64-apple-ios/release/libmatrix_crypto_core.a"
 UNIVERSAL_LIB="$BUILD_DIR/libmatrix_crypto_core.a"
 
-if [ -f "$DEVICE_LIB" ] && [ -f "$SIMULATOR_LIB" ]; then
-    lipo -create "$DEVICE_LIB" "$SIMULATOR_LIB" -output "$UNIVERSAL_LIB"
-    echo -e "${GREEN}✓ Created universal library${NC}"
-else
-    echo -e "${RED}✗ Could not find compiled libraries${NC}"
+echo "Looking for device library: $DEVICE_LIB"
+if [ ! -f "$DEVICE_LIB" ]; then
+    echo -e "${RED}✗ Device library not found: $DEVICE_LIB${NC}"
+    echo "Available files in target/aarch64-apple-ios/release/:"
+    ls -la "$RUST_DIR/target/aarch64-apple-ios/release/" 2>/dev/null || echo "Directory not found"
     exit 1
 fi
+
+echo "Looking for simulator library: $SIMULATOR_LIB"
+if [ ! -f "$SIMULATOR_LIB" ]; then
+    echo -e "${RED}✗ Simulator library not found: $SIMULATOR_LIB${NC}"
+    echo "Available files in target/x86_64-apple-ios/release/:"
+    ls -la "$RUST_DIR/target/x86_64-apple-ios/release/" 2>/dev/null || echo "Directory not found"
+    exit 1
+fi
+
+echo "Creating universal library from:"
+echo "  Device:    $DEVICE_LIB"
+echo "  Simulator: $SIMULATOR_LIB"
+
+lipo -create "$DEVICE_LIB" "$SIMULATOR_LIB" -output "$UNIVERSAL_LIB"
+echo -e "${GREEN}✓ Created universal library: $UNIVERSAL_LIB${NC}"
 
 # Create XCFramework
 echo ""
@@ -109,6 +137,9 @@ cp "$DEVICE_LIB" "$FRAMEWORK_DIR_DEVICE/MatrixCryptoBridge"
 cp "$SIMULATOR_LIB" "$FRAMEWORK_DIR_SIMULATOR/MatrixCryptoBridge"
 
 # Create module maps
+mkdir -p "$FRAMEWORK_DIR_DEVICE/Modules"
+mkdir -p "$FRAMEWORK_DIR_SIMULATOR/Modules"
+
 cat > "$FRAMEWORK_DIR_DEVICE/Modules/module.modulemap" << 'EOF'
 framework module MatrixCryptoBridge {
     header "MatrixCryptoBridge.h"
@@ -123,12 +154,42 @@ framework module MatrixCryptoBridge {
 }
 EOF
 
+# Create Info.plist files
+cat > "$FRAMEWORK_DIR_DEVICE/Info.plist" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>MatrixCryptoBridge</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.matrix.crypto.bridge</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>MatrixCryptoBridge</string>
+    <key>CFBundlePackageType</key>
+    <string>FMWK</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+</dict>
+</plist>
+EOF
+
+cp "$FRAMEWORK_DIR_DEVICE/Info.plist" "$FRAMEWORK_DIR_SIMULATOR/Info.plist"
+
 # Create XCFramework
-xcodebuild -create-xcframework \
+if ! xcodebuild -create-xcframework \
     -framework "$FRAMEWORK_DIR_DEVICE" \
     -framework "$FRAMEWORK_DIR_SIMULATOR" \
-    -output "$XCFRAMEWORK_PATH" \
-    2>&1 | grep -E "Creating|error" || true
+    -output "$XCFRAMEWORK_PATH"; then
+    echo -e "${RED}✗ Failed to create XCFramework${NC}"
+    exit 1
+fi
 
 if [ -d "$XCFRAMEWORK_PATH" ]; then
     echo -e "${GREEN}✓ Created XCFramework${NC}"
