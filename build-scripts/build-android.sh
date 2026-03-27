@@ -93,6 +93,36 @@ for target in "${ANDROID_TARGETS[@]}"; do
     fi
 done
 
+# Create Cargo config for cross-compilation
+echo ""
+echo -e "${YELLOW}Setting up Cargo configuration for cross-compilation...${NC}"
+
+CARGO_CONFIG_DIR="$RUST_DIR/.cargo"
+mkdir -p "$CARGO_CONFIG_DIR"
+
+# Create cargo config with proper cross-compilation settings
+cat > "$CARGO_CONFIG_DIR/config.toml" << EOF
+[build]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.aarch64-linux-android]
+ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/llvm-ar"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/aarch64-linux-android21-clang"
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.armv7-linux-androideabi]
+ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/llvm-ar"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/armv7a-linux-android21-clang"
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+[target.x86_64-linux-android]
+ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/llvm-ar"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/x86_64-linux-android21-clang"
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+EOF
+
+echo -e "${GREEN}✓ Cargo configuration created${NC}"
+
 # Build for each Android target
 echo ""
 echo -e "${YELLOW}Building Rust for Android...${NC}"
@@ -102,42 +132,13 @@ cd "$RUST_DIR"
 # Function to build for a target
 build_android_target() {
     local target=$1
-    local ndk_arch=$2
-    local api_level=${3:-21}
+    local arch_name=$2
     
     echo ""
-    echo "Building for $target (API level $api_level)..."
-    
-    # Construct the correct compiler name based on NDK structure
-    # NDK compilers are named like: aarch64-linux-android21-clang, armv7a-linux-android21-clang, etc.
-    local compiler_name="${ndk_arch}-linux-android${api_level}-clang"
-    local compiler_path="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/${compiler_name}"
-    
-    # For armv7-linux-androideabi, the compiler is named armv7a-linux-android*-clang
-    if [ "$target" = "armv7-linux-androideabi" ]; then
-        compiler_name="armv7a-linux-android${api_level}-clang"
-        compiler_path="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/${compiler_name}"
-    fi
-    
-    echo "Looking for compiler: $compiler_path"
-    
-    # Check if compiler exists
-    if [ ! -f "$compiler_path" ]; then
-        echo -e "${RED}✗ Compiler not found: $compiler_path${NC}"
-        echo "Available compilers in NDK:"
-        ls "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/${ndk_arch}*-clang" 2>/dev/null | head -5 || echo "None found"
-        return 1
-    fi
-    
-    # Set up environment variables for cross-compilation
-    export CC="$compiler_path"
-    export AR="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/llvm-ar"
-    export RANLIB="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/llvm-ranlib"
-    
-    echo "Using compiler: $CC"
+    echo "Building for $target..."
     
     # Build with cargo
-    if ! cargo build --release --target "$target" 2>&1 | grep -E "Compiling|Finished|error" || true; then
+    if ! cargo build --release --target "$target"; then
         echo -e "${RED}✗ Failed to build for $target${NC}"
         return 1
     fi
@@ -146,22 +147,24 @@ build_android_target() {
     return 0
 }
 
-# Build for each target with API level 21 (minimum for most apps)
-build_android_target "aarch64-linux-android" "aarch64" "21" || exit 1
-build_android_target "armv7-linux-androideabi" "armv7a" "21" || exit 1
-build_android_target "x86_64-linux-android" "x86_64" "21" || exit 1
+# Build for each target
+build_android_target "aarch64-linux-android" "arm64-v8a" || exit 1
+build_android_target "armv7-linux-androideabi" "armeabi-v7a" || exit 1
+build_android_target "x86_64-linux-android" "x86_64" || exit 1
 
 # Generate Kotlin bindings
 echo ""
 echo -e "${YELLOW}Generating Kotlin bindings...${NC}"
 
 if command -v uniffi-bindgen &> /dev/null; then
-    uniffi-bindgen generate \
+    if uniffi-bindgen generate \
         "$RUST_DIR/src/matrix_crypto.udl" \
         --language kotlin \
-        --out-dir "$ANDROID_DIR/generated" \
-        2>&1 | grep -E "Generating|error" || true
-    echo -e "${GREEN}✓ Generated Kotlin bindings${NC}"
+        --out-dir "$ANDROID_DIR/generated"; then
+        echo -e "${GREEN}✓ Generated Kotlin bindings${NC}"
+    else
+        echo -e "${YELLOW}⚠ Kotlin binding generation had issues${NC}"
+    fi
 else
     echo -e "${YELLOW}Note: uniffi-bindgen not found, skipping Kotlin binding generation${NC}"
     echo "Install with: cargo install uniffi --features=cli"
@@ -176,27 +179,33 @@ mkdir -p "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a"
 mkdir -p "$ANDROID_DIR/src/main/jniLibs/x86_64"
 
 echo "Copying aarch64 library..."
-if cp "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" \
-   "$ANDROID_DIR/src/main/jniLibs/arm64-v8a/" 2>/dev/null; then
+if [ -f "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
+    cp "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" \
+       "$ANDROID_DIR/src/main/jniLibs/arm64-v8a/"
     echo -e "${GREEN}✓ Copied arm64-v8a library${NC}"
 else
-    echo -e "${YELLOW}⚠ arm64-v8a library not found${NC}"
+    echo -e "${RED}✗ arm64-v8a library not found${NC}"
+    exit 1
 fi
 
 echo "Copying armv7 library..."
-if cp "$RUST_DIR/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
-   "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a/" 2>/dev/null; then
+if [ -f "$RUST_DIR/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
+    cp "$RUST_DIR/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
+       "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a/"
     echo -e "${GREEN}✓ Copied armeabi-v7a library${NC}"
 else
-    echo -e "${YELLOW}⚠ armeabi-v7a library not found${NC}"
+    echo -e "${RED}✗ armeabi-v7a library not found${NC}"
+    exit 1
 fi
 
 echo "Copying x86_64 library..."
-if cp "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.so" \
-   "$ANDROID_DIR/src/main/jniLibs/x86_64/" 2>/dev/null; then
+if [ -f "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
+    cp "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.so" \
+       "$ANDROID_DIR/src/main/jniLibs/x86_64/"
     echo -e "${GREEN}✓ Copied x86_64 library${NC}"
 else
-    echo -e "${YELLOW}⚠ x86_64 library not found${NC}"
+    echo -e "${RED}✗ x86_64 library not found${NC}"
+    exit 1
 fi
 
 # Build Android AAR
@@ -205,10 +214,10 @@ echo -e "${YELLOW}Building Android AAR...${NC}"
 
 if command -v gradle &> /dev/null; then
     cd "$ANDROID_DIR"
-    if gradle build 2>&1 | grep -E "BUILD|error" || true; then
+    if gradle build; then
         echo -e "${GREEN}✓ Built Android AAR${NC}"
     else
-        echo -e "${YELLOW}Note: Gradle build completed${NC}"
+        echo -e "${YELLOW}Note: Gradle build completed with warnings${NC}"
     fi
 else
     echo -e "${YELLOW}Note: Gradle not found, skipping AAR build${NC}"
