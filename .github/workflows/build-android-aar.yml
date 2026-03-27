@@ -1,0 +1,70 @@
+name: Build Android AAR
+
+on:
+  push:
+    branches: [main, master, develop]
+    tags: ['v*']
+    paths:
+      - 'matrix-crypto-core/**'
+      - 'matrix-crypto-android/**'
+      - 'build-scripts/**'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-android-aar:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'matrix-crypto-core'
+      
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - uses: android-actions/setup-android@v3
+      
+      - name: Install Android NDK
+        run: |
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.1.12297006"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.1.12297006" >> $GITHUB_ENV
+      
+      - name: Install uniffi-bindgen
+        run: cargo install uniffi --features=cli
+      
+      - name: Build Rust for Android
+        run: |
+          chmod +x ./build-scripts/build-android.sh
+          ./build-scripts/build-android.sh
+      
+      - name: Build Android AAR
+        run: |
+          cd matrix-crypto-android
+          chmod +x ./gradlew
+          ./gradlew build
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-aar
+          path: matrix-crypto-android/build/outputs/aar/
+          retention-days: 30
+      
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: matrix-crypto-android/build/outputs/aar/**/*.aar
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -1,0 +1,54 @@
+name: Build iOS XCFramework
+
+on:
+  push:
+    branches: [main, master, develop]
+    tags: ['v*']
+    paths:
+      - 'matrix-crypto-core/**'
+      - 'matrix-crypto-ios/**'
+      - 'build-scripts/**'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-ios-xcframework:
+    runs-on: macos-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,x86_64-apple-ios
+      
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'matrix-crypto-core'
+      
+      - name: Install uniffi-bindgen
+        run: cargo install uniffi --features=cli
+      
+      - name: Build Rust for iOS
+        run: |
+          chmod +x ./build-scripts/build-ios.sh
+          ./build-scripts/build-ios.sh
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcframework
+          path: matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/
+          retention-days: 30
+      
+      - name: Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/**
+            matrix-crypto-ios/generated/**
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
