@@ -7,7 +7,7 @@ This guide explains how to integrate the Matrix Crypto Bridge into your React Na
 ### 1. Install the npm package
 
 ```bash
-npm install @matrix-chat/react-native-crypto
+npm install @k9o/react-native-matrix-crypto
 ```
 
 ### 2. Link native modules
@@ -21,7 +21,7 @@ expo prebuild --clean
 #### For bare React Native projects:
 
 ```bash
-react-native link @matrix-chat/react-native-crypto
+react-native link @k9o/react-native-matrix-crypto
 ```
 
 ### 3. iOS Setup
@@ -55,21 +55,17 @@ The Gradle configuration is automatic. Just ensure:
 ### Basic Initialization
 
 ```typescript
-import { MatrixCrypto } from '@matrix-chat/react-native-crypto';
+import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
 
 // Get singleton instance
 const crypto = MatrixCrypto.getInstance();
 
 // Initialize with user credentials
-await crypto.initialize(
-  '@user:example.com',
-  'DEVICE_ID',
-  'pickle_key'
-);
+await crypto.initialize("@user:example.com", "DEVICE_ID", "pickle_key");
 
 // Get device fingerprint
 const fingerprint = await crypto.getDeviceFingerprint();
-console.log('Device fingerprint:', fingerprint);
+console.log("Device fingerprint:", fingerprint);
 ```
 
 ### Device Verification
@@ -77,13 +73,13 @@ console.log('Device fingerprint:', fingerprint);
 ```typescript
 // Start verification with another device
 const verification = await crypto.startVerification(
-  '@other:example.com',
-  'OTHER_DEVICE_ID'
+  "@other:example.com",
+  "OTHER_DEVICE_ID",
 );
 
 // Get SAS emojis to compare
 const emojis = await crypto.getSASEmojis(verification.verificationId);
-console.log('Compare these emojis:', emojis);
+console.log("Compare these emojis:", emojis);
 
 // After user confirms the emojis match
 await crypto.confirmSAS(verification.verificationId);
@@ -96,26 +92,20 @@ await crypto.completeVerification(verification.verificationId);
 
 ```typescript
 // Enable encryption for a room
-await crypto.enableRoomEncryption(
-  '!room:example.com',
-  'm.megolm.v1.aes-sha2'
-);
+await crypto.enableRoomEncryption("!room:example.com", "m.megolm.v1.aes-sha2");
 
 // Encrypt an event
 const encrypted = await crypto.encryptEvent(
-  '!room:example.com',
-  'm.room.message',
+  "!room:example.com",
+  "m.room.message",
   JSON.stringify({
-    body: 'Hello, encrypted world!',
-    msgtype: 'm.text'
-  })
+    body: "Hello, encrypted world!",
+    msgtype: "m.text",
+  }),
 );
 
 // Decrypt an event
-const decrypted = await crypto.decryptEvent(
-  '!room:example.com',
-  encrypted
-);
+const decrypted = await crypto.decryptEvent("!room:example.com", encrypted);
 ```
 
 ### High-Level API
@@ -123,21 +113,21 @@ const decrypted = await crypto.decryptEvent(
 For a more convenient API, use the `CryptoAPI` class:
 
 ```typescript
-import { CryptoAPI } from '@matrix-chat/react-native-crypto';
+import { CryptoAPI } from "@k9o/react-native-matrix-crypto";
 
 const api = new CryptoAPI();
 
 // Initialize
-await api.initialize('@user:example.com', 'DEVICE_ID', 'pickle_key');
+await api.initialize("@user:example.com", "DEVICE_ID", "pickle_key");
 
 // Get device info
 const deviceInfo = await api.getDeviceInfo();
-console.log('Device:', deviceInfo);
+console.log("Device:", deviceInfo);
 
 // Start verification
 const verification = await api.startVerification(
-  '@other:example.com',
-  'OTHER_DEVICE_ID'
+  "@other:example.com",
+  "OTHER_DEVICE_ID",
 );
 
 // Get emojis
@@ -148,16 +138,16 @@ await api.confirmSAS(verification.verificationId);
 await api.completeVerification(verification.verificationId);
 
 // Enable room encryption
-await api.enableRoomEncryption('!room:example.com');
+await api.enableRoomEncryption("!room:example.com");
 
 // Encrypt/decrypt
 const encrypted = await api.encryptEvent(
-  '!room:example.com',
-  'm.room.message',
-  JSON.stringify({ body: 'Hello' })
+  "!room:example.com",
+  "m.room.message",
+  JSON.stringify({ body: "Hello" }),
 );
 
-const decrypted = await api.decryptEvent('!room:example.com', encrypted);
+const decrypted = await api.decryptEvent("!room:example.com", encrypted);
 
 // Cleanup
 await api.destroy();
@@ -168,14 +158,14 @@ await api.destroy();
 To use with matrix-js-sdk v41:
 
 ```typescript
-import { createClient } from 'matrix-js-sdk';
-import { MatrixCrypto } from '@matrix-chat/react-native-crypto';
+import { createClient } from "matrix-js-sdk";
+import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
 
 const crypto = MatrixCrypto.getInstance();
 await crypto.initialize(userId, deviceId, pickleKey);
 
 const client = createClient({
-  baseUrl: 'https://matrix.example.com',
+  baseUrl: "https://matrix.example.com",
   userId,
   deviceId,
   // Configure crypto callbacks
@@ -184,16 +174,16 @@ const client = createClient({
       return await crypto.encryptEvent(
         event.room_id,
         event.type,
-        JSON.stringify(event.content)
+        JSON.stringify(event.content),
       );
     },
     decryptEvent: async (event) => {
       return await crypto.decryptEvent(
         event.room_id,
-        JSON.stringify(event.content)
+        JSON.stringify(event.content),
       );
-    }
-  }
+    },
+  },
 });
 
 await client.startClient();
@@ -207,7 +197,7 @@ All methods throw errors on failure. Handle them appropriately:
 try {
   await crypto.initialize(userId, deviceId, pickleKey);
 } catch (error) {
-  console.error('Failed to initialize crypto:', error.message);
+  console.error("Failed to initialize crypto:", error.message);
   // Fallback to JS crypto or show error to user
 }
 ```
@@ -216,12 +206,12 @@ try {
 
 The native Rust crypto provides significant performance improvements:
 
-| Operation | Time |
-|-----------|------|
-| Encrypt | 2ms |
-| Decrypt | 3ms |
-| Device Verification | 8ms |
-| Room Key Rotation | 15ms |
+| Operation           | Time |
+| ------------------- | ---- |
+| Encrypt             | 2ms  |
+| Decrypt             | 3ms  |
+| Device Verification | 8ms  |
+| Room Key Rotation   | 15ms |
 
 Compared to JavaScript crypto (45-280ms), this is 10-100x faster.
 
@@ -232,14 +222,16 @@ Compared to JavaScript crypto (45-280ms), this is 10-100x faster.
 **Error**: `Native module RNMatrixCrypto not found`
 
 **Solution**:
+
 - For Expo: Run `expo prebuild --clean`
-- For bare RN: Run `react-native link @matrix-chat/react-native-crypto`
+- For bare RN: Run `react-native link @k9o/react-native-matrix-crypto`
 
 ### iOS build fails
 
 **Error**: `MatrixCryptoBridge not found`
 
 **Solution**:
+
 1. Ensure XCFramework is in the project
 2. Add to Build Settings > Framework Search Paths
 3. Run `pod install` again
@@ -249,6 +241,7 @@ Compared to JavaScript crypto (45-280ms), this is 10-100x faster.
 **Error**: `Native library not found`
 
 **Solution**:
+
 1. Ensure NDK is installed: `$ANDROID_NDK_HOME/bin/ndk-build --version`
 2. Set environment: `export ANDROID_NDK_HOME=/path/to/ndk`
 3. Rebuild: `./gradlew clean build`

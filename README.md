@@ -5,6 +5,7 @@ A production-ready native Rust bridge using UniFFI to expose the matrix-sdk-cryp
 ## Problem
 
 Matrix.js SDK v41 requires the Rust crypto backend (`matrix-sdk-crypto`), but:
+
 - **WASM doesn't work on React Native** — Hermes JavaScript engine doesn't support WebAssembly
 - **JavaScript crypto is slow** — 45-120ms per operation vs 2-15ms with native Rust
 - **No fallback available** — matrix-js-sdk v41 dropped the JS/Olm backend entirely
@@ -12,6 +13,7 @@ Matrix.js SDK v41 requires the Rust crypto backend (`matrix-sdk-crypto`), but:
 ## Solution
 
 This project provides a **complete, production-ready Rust bridge** that:
+
 - ✅ Exposes matrix-sdk-crypto via native modules (Swift for iOS, Kotlin for Android)
 - ✅ Uses UniFFI for automatic binding generation
 - ✅ Provides TypeScript API for easy integration
@@ -21,12 +23,12 @@ This project provides a **complete, production-ready Rust bridge** that:
 
 ## Performance Gains
 
-| Operation | JS Crypto | Native Rust | Speedup |
-|-----------|-----------|-------------|---------|
-| Encrypt | 45ms | 2ms | **22x** |
-| Decrypt | 52ms | 3ms | **17x** |
-| Device Verification | 120ms | 8ms | **15x** |
-| Room Key Rotation | 280ms | 15ms | **18x** |
+| Operation           | JS Crypto | Native Rust | Speedup |
+| ------------------- | --------- | ----------- | ------- |
+| Encrypt             | 45ms      | 2ms         | **22x** |
+| Decrypt             | 52ms      | 3ms         | **17x** |
+| Device Verification | 120ms     | 8ms         | **15x** |
+| Room Key Rotation   | 280ms     | 15ms        | **18x** |
 
 ## Project Structure
 
@@ -94,6 +96,7 @@ cargo install uniffi --features=cli
 ```
 
 This will:
+
 - Build Rust for iOS device and simulator
 - Generate Swift bindings
 - Create XCFramework at `matrix-crypto-ios/build/MatrixCryptoBridge.xcframework`
@@ -108,6 +111,7 @@ export ANDROID_NDK_HOME=/path/to/ndk/r25
 ```
 
 This will:
+
 - Build Rust for ARM64, ARMv7, and x86_64
 - Generate Kotlin bindings
 - Create AAR at `matrix-crypto-android/build/outputs/aar/`
@@ -143,41 +147,37 @@ dependencies {
 
 ```bash
 # Install npm package
-npm install @matrix-chat/react-native-crypto
+npm install @k9o/react-native-matrix-crypto
 
 # For Expo
 expo prebuild --clean
 
 # For bare React Native
-react-native link @matrix-chat/react-native-crypto
+react-native link @k9o/react-native-matrix-crypto
 ```
 
 ### 6. Use in Your Code
 
 ```typescript
-import { MatrixCrypto } from '@matrix-chat/react-native-crypto';
+import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
 
 // Initialize
 const crypto = MatrixCrypto.getInstance();
-await crypto.initialize(
-  '@user:example.com',
-  'DEVICE_ID',
-  'pickle_key'
-);
+await crypto.initialize("@user:example.com", "DEVICE_ID", "pickle_key");
 
 // Get device fingerprint
 const fingerprint = await crypto.getDeviceFingerprint();
-console.log('Device fingerprint:', fingerprint);
+console.log("Device fingerprint:", fingerprint);
 
 // Start device verification
 const verification = await crypto.startVerification(
-  '@other:example.com',
-  'OTHER_DEVICE_ID'
+  "@other:example.com",
+  "OTHER_DEVICE_ID",
 );
 
 // Get SAS emojis
 const emojis = await crypto.getSASEmojis(verification.verificationId);
-console.log('Compare emojis:', emojis);
+console.log("Compare emojis:", emojis);
 
 // Confirm and complete
 await crypto.confirmSAS(verification.verificationId);
@@ -185,15 +185,12 @@ await crypto.completeVerification(verification.verificationId);
 
 // Encrypt/decrypt
 const encrypted = await crypto.encryptEvent(
-  '!room:example.com',
-  'm.room.message',
-  JSON.stringify({ body: 'Hello' })
+  "!room:example.com",
+  "m.room.message",
+  JSON.stringify({ body: "Hello" }),
 );
 
-const decrypted = await crypto.decryptEvent(
-  '!room:example.com',
-  encrypted
-);
+const decrypted = await crypto.decryptEvent("!room:example.com", encrypted);
 ```
 
 ## Architecture
@@ -246,11 +243,18 @@ High-level TypeScript interface:
 
 ```typescript
 class MatrixCrypto {
-    static getInstance(): MatrixCrypto
-    async initialize(userId: string, deviceId: string, pickleKey: string): Promise<void>
-    async getDeviceFingerprint(): Promise<string>
-    async startVerification(otherUserId: string, otherDeviceId: string): Promise<VerificationState>
-    // ... more methods
+  static getInstance(): MatrixCrypto;
+  async initialize(
+    userId: string,
+    deviceId: string,
+    pickleKey: string,
+  ): Promise<void>;
+  async getDeviceFingerprint(): Promise<string>;
+  async startVerification(
+    otherUserId: string,
+    otherDeviceId: string,
+  ): Promise<VerificationState>;
+  // ... more methods
 }
 ```
 
@@ -273,6 +277,7 @@ Builds iOS framework:
 ```
 
 Creates:
+
 - Universal library (device + simulator)
 - XCFramework for easy integration
 
@@ -285,12 +290,14 @@ Builds Android library:
 ```
 
 Creates:
+
 - Native libraries for ARM64, ARMv7, x86_64
 - AAR package for Gradle
 
 ## CI/CD
 
 GitHub Actions workflows automatically:
+
 - Build Rust for all targets
 - Generate bindings
 - Build iOS framework
@@ -298,6 +305,7 @@ GitHub Actions workflows automatically:
 - Publish to npm on release
 
 Trigger with:
+
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
@@ -318,6 +326,7 @@ export ANDROID_NDK_HOME=/path/to/ndk/r25
 ```
 
 Or install via Android Studio:
+
 1. Open Android Studio
 2. SDK Manager → SDK Tools
 3. Check "NDK (Side by side)"
@@ -342,13 +351,15 @@ Or use GitHub Actions to build on Linux.
 ### "Native module not linked"
 
 For Expo:
+
 ```bash
 expo prebuild --clean
 ```
 
 For bare React Native:
+
 ```bash
-react-native link @matrix-chat/react-native-crypto
+react-native link @k9o/react-native-matrix-crypto
 ```
 
 ## Integration with matrix-js-sdk
@@ -356,8 +367,8 @@ react-native link @matrix-chat/react-native-crypto
 In your Matrix client:
 
 ```typescript
-import { MatrixCrypto } from '@matrix-chat/react-native-crypto';
-import { createClient } from 'matrix-js-sdk';
+import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
+import { createClient } from "matrix-js-sdk";
 
 // Initialize native crypto
 const crypto = MatrixCrypto.getInstance();
@@ -365,14 +376,16 @@ await crypto.initialize(userId, deviceId, pickleKey);
 
 // Create Matrix client
 const client = createClient({
-  baseUrl: 'https://matrix.example.com',
+  baseUrl: "https://matrix.example.com",
   userId,
   deviceId,
   cryptoCallbacks: {
     // Use native crypto for encryption/decryption
-    encryptEvent: (event) => crypto.encryptEvent(roomId, event.type, JSON.stringify(event.content)),
-    decryptEvent: (event) => crypto.decryptEvent(roomId, JSON.stringify(event.content)),
-  }
+    encryptEvent: (event) =>
+      crypto.encryptEvent(roomId, event.type, JSON.stringify(event.content)),
+    decryptEvent: (event) =>
+      crypto.decryptEvent(roomId, JSON.stringify(event.content)),
+  },
 });
 ```
 
@@ -424,6 +437,7 @@ Apache License 2.0 - See LICENSE file
 ## Contributing
 
 Contributions welcome! Please:
+
 1. Fork the repository
 2. Create a feature branch
 3. Submit a pull request
@@ -448,6 +462,7 @@ Contributions welcome! Please:
 ## Acknowledgments
 
 Built with:
+
 - [matrix-sdk-crypto](https://github.com/matrix-org/matrix-rust-sdk) - Rust crypto library
 - [UniFFI](https://mozilla.github.io/uniffi-rs/) - Foreign function interface bindings
 - [React Native](https://reactnative.dev/) - Mobile framework
