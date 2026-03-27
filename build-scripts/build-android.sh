@@ -13,9 +13,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 RUST_DIR="$PROJECT_ROOT/matrix-crypto-core"
 ANDROID_DIR="$PROJECT_ROOT/matrix-crypto-android"
+WORKSPACE_TARGET="$PROJECT_ROOT/target"
 
 echo -e "${GREEN}Matrix Crypto Bridge - Android Build Script${NC}"
 echo "Project root: $PROJECT_ROOT"
+echo "Rust dir: $RUST_DIR"
 echo ""
 
 # Check if Rust is installed
@@ -160,6 +162,7 @@ if command -v uniffi-bindgen &> /dev/null; then
     if uniffi-bindgen generate \
         "$RUST_DIR/src/matrix_crypto.udl" \
         --language kotlin \
+        --no-format \
         --out-dir "$ANDROID_DIR/generated"; then
         echo -e "${GREEN}✓ Generated Kotlin bindings${NC}"
     else
@@ -179,23 +182,19 @@ mkdir -p "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a"
 mkdir -p "$ANDROID_DIR/src/main/jniLibs/x86_64"
 
 echo "Copying aarch64 library..."
-echo "Looking for: $RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so"
-echo "Available files:"
-ls -lah "$RUST_DIR/target/aarch64-linux-android/release/" 2>/dev/null | grep -E "libmatrix|total" || echo "No matrix files found"
-if [ -f "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
-    cp "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" \
+if [ -f "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
+    cp "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" \
        "$ANDROID_DIR/src/main/jniLibs/arm64-v8a/"
     echo -e "${GREEN}✓ Copied arm64-v8a library${NC}"
 else
     echo -e "${RED}✗ arm64-v8a library not found${NC}"
-    echo "Checking if .a (static) library exists:"
-    ls -lah "$RUST_DIR/target/aarch64-linux-android/release/"*matrix* 2>/dev/null || echo "No matrix libraries found"
+    echo "Looking for: $WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so"
     exit 1
 fi
 
 echo "Copying armv7 library..."
-if [ -f "$RUST_DIR/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
-    cp "$RUST_DIR/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
+if [ -f "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
+    cp "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
        "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a/"
     echo -e "${GREEN}✓ Copied armeabi-v7a library${NC}"
 else
@@ -204,8 +203,8 @@ else
 fi
 
 echo "Copying x86_64 library..."
-if [ -f "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
-    cp "$RUST_DIR/target/x86_64-linux-android/release/libmatrix_crypto_core.so" \
+if [ -f "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
+    cp "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" \
        "$ANDROID_DIR/src/main/jniLibs/x86_64/"
     echo -e "${GREEN}✓ Copied x86_64 library${NC}"
 else
@@ -213,30 +212,15 @@ else
     exit 1
 fi
 
-# Build Android AAR
+# Build Android AAR (optional - Gradle is not required for development)
 echo ""
-echo -e "${YELLOW}Building Android AAR...${NC}"
-
-if command -v gradle &> /dev/null; then
-    cd "$ANDROID_DIR"
-    if gradle build; then
-        echo -e "${GREEN}✓ Built Android AAR${NC}"
-    else
-        echo -e "${YELLOW}Note: Gradle build completed with warnings${NC}"
-    fi
-else
-    echo -e "${YELLOW}Note: Gradle not found, skipping AAR build${NC}"
-    echo "Install Android Studio or Gradle to build AAR"
-fi
-
-echo ""
-echo -e "${GREEN}✓ Android build complete!${NC}"
+echo -e "${YELLOW}Android build complete!${NC}"
 echo ""
 echo -e "${BLUE}Build artifacts:${NC}"
 
 # Check and report built libraries
 for target in "${ANDROID_TARGETS[@]}"; do
-    lib_path="$RUST_DIR/target/$target/release/libmatrix_crypto_core.so"
+    lib_path="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_core.so"
     if [ -f "$lib_path" ]; then
         size=$(du -h "$lib_path" | cut -f1)
         echo "  - $target: $size"
@@ -245,7 +229,14 @@ done
 
 echo ""
 echo -e "${BLUE}Next steps:${NC}"
-echo "  1. Open Android Studio"
-echo "  2. Import matrix-crypto-android module"
-echo "  3. Build the project"
-echo "  4. Link in your React Native app"
+echo "  1. Libraries are ready in matrix-crypto-android/src/main/jniLibs/"
+echo "  2. Open Android Studio"
+echo "  3. Import matrix-crypto-android module"
+echo "  4. Build the project (Gradle will package the .so files into AAR)"
+echo "  5. Link in your React Native app"
+echo ""
+echo -e "${BLUE}Optional: Build AAR with Gradle${NC}"
+echo "  If you want to build the AAR file locally:"
+echo "  1. Install Gradle: brew install gradle (macOS) or download from gradle.org"
+echo "  2. Run: cd matrix-crypto-android && gradle build"
+echo "  3. AAR file will be in: matrix-crypto-android/build/outputs/aar/"
