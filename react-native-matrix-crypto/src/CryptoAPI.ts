@@ -94,10 +94,11 @@ export class CryptoAPI {
   ): Promise<VerificationState> {
     this.assertInitialized();
     try {
-      return await NativeMatrixCrypto.startVerification(
+      const result = await NativeMatrixCrypto.startVerification(
         otherUserId,
         otherDeviceId
       );
+      return result as VerificationState;
     } catch (error) {
       throw new Error(`Failed to start verification: ${error}`);
     }
@@ -159,7 +160,8 @@ export class CryptoAPI {
   ): Promise<VerificationState> {
     this.assertInitialized();
     try {
-      return await NativeMatrixCrypto.getVerificationState(verificationId);
+      const result = await NativeMatrixCrypto.getVerificationState(verificationId);
+      return result as VerificationState;
     } catch (error) {
       throw new Error(`Failed to get verification state: ${error}`);
     }
