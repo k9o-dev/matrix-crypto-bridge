@@ -7,7 +7,7 @@ This guide explains how to integrate the Matrix Crypto Bridge into your React Na
 ### 1. Install the npm package
 
 ```bash
-npm install @k9o/react-native-matrix-crypto
+npm install @k9o/react-native-fortress-crypto
 ```
 
 ### 2. Link native modules
@@ -21,7 +21,7 @@ expo prebuild --clean
 #### For bare React Native projects:
 
 ```bash
-react-native link @k9o/react-native-matrix-crypto
+react-native link @k9o/react-native-fortress-crypto
 ```
 
 ### 3. iOS Setup
@@ -55,7 +55,7 @@ The Gradle configuration is automatic. Just ensure:
 ### Basic Initialization
 
 ```typescript
-import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
+import { MatrixCrypto } from "@k9o/react-native-fortress-crypto";
 
 // Get singleton instance
 const crypto = MatrixCrypto.getInstance();
@@ -113,7 +113,7 @@ const decrypted = await crypto.decryptEvent("!room:example.com", encrypted);
 For a more convenient API, use the `CryptoAPI` class:
 
 ```typescript
-import { CryptoAPI } from "@k9o/react-native-matrix-crypto";
+import { CryptoAPI } from "@k9o/react-native-fortress-crypto";
 
 const api = new CryptoAPI();
 
@@ -159,7 +159,7 @@ To use with matrix-js-sdk v41:
 
 ```typescript
 import { createClient } from "matrix-js-sdk";
-import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
+import { MatrixCrypto } from "@k9o/react-native-fortress-crypto";
 
 const crypto = MatrixCrypto.getInstance();
 await crypto.initialize(userId, deviceId, pickleKey);
@@ -224,7 +224,7 @@ Compared to JavaScript crypto (45-280ms), this is 10-100x faster.
 **Solution**:
 
 - For Expo: Run `expo prebuild --clean`
-- For bare RN: Run `react-native link @k9o/react-native-matrix-crypto`
+- For bare RN: Run `react-native link @k9o/react-native-fortress-crypto`
 
 ### iOS build fails
 

@@ -33,8 +33,8 @@ This project provides a **complete, production-ready Rust bridge** that:
 ## Project Structure
 
 ```
-matrix-crypto-bridge/
-├── matrix-crypto-core/              # Rust core library (UniFFI)
+fortress-crypto-bridge/
+├── fortress-crypto-core/              # Rust core library (UniFFI)
 │   ├── src/
 │   │   ├── lib.rs                   # UniFFI interface
 │   │   ├── crypto.rs                # OlmMachine wrapper
@@ -42,14 +42,14 @@ matrix-crypto-bridge/
 │   │   └── error.rs                 # Error handling
 │   ├── Cargo.toml
 │   └── uniffi.toml
-├── matrix-crypto-ios/               # iOS native module
+├── fortress-crypto-ios/               # iOS native module
 │   ├── MatrixCryptoBridge.swift     # Swift wrapper
 │   └── build/                       # Built frameworks
-├── matrix-crypto-android/           # Android native module
+├── fortress-crypto-android/           # Android native module
 │   ├── src/main/kotlin/             # Kotlin wrapper
 │   ├── build.gradle
 │   └── CMakeLists.txt               # JNI build config
-├── react-native-matrix-crypto/      # React Native module
+├── react-native-fortress-crypto/      # React Native module
 │   ├── src/index.ts                 # TypeScript API
 │   └── package.json
 ├── build-scripts/
@@ -72,8 +72,8 @@ matrix-crypto-bridge/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/techscorpion-dev/matrix-crypto-bridge.git
-cd matrix-crypto-bridge
+git clone https://github.com/techscorpion-dev/fortress-crypto-bridge.git
+cd fortress-crypto-bridge
 ```
 
 ### 2. Install Rust Targets
@@ -99,7 +99,7 @@ This will:
 
 - Build Rust for iOS device and simulator
 - Generate Swift bindings
-- Create XCFramework at `matrix-crypto-ios/build/MatrixCryptoBridge.xcframework`
+- Create XCFramework at `fortress-crypto-ios/build/MatrixCryptoBridge.xcframework`
 
 ### 4. Build for Android
 
@@ -114,7 +114,7 @@ This will:
 
 - Build Rust for ARM64, ARMv7, and x86_64
 - Generate Kotlin bindings
-- Create AAR at `matrix-crypto-android/build/outputs/aar/`
+- Create AAR at `fortress-crypto-android/build/outputs/aar/`
 
 ### 5. Integrate into Your React Native App
 
@@ -122,7 +122,7 @@ This will:
 
 ```bash
 # Copy XCFramework to your project
-cp -r matrix-crypto-ios/build/MatrixCryptoBridge.xcframework \
+cp -r fortress-crypto-ios/build/MatrixCryptoBridge.xcframework \
    /path/to/your/app/ios/Frameworks/
 
 # In Xcode:
@@ -134,12 +134,12 @@ cp -r matrix-crypto-ios/build/MatrixCryptoBridge.xcframework \
 
 ```bash
 # Copy AAR to your project
-cp matrix-crypto-android/build/outputs/aar/*.aar \
+cp fortress-crypto-android/build/outputs/aar/*.aar \
    /path/to/your/app/android/app/libs/
 
 # In build.gradle:
 dependencies {
-    implementation files('libs/matrix-crypto-android-release.aar')
+    implementation files('libs/fortress-crypto-android-release.aar')
 }
 ```
 
@@ -147,19 +147,19 @@ dependencies {
 
 ```bash
 # Install npm package
-npm install @k9o/react-native-matrix-crypto
+npm install @k9o/react-native-fortress-crypto
 
 # For Expo
 expo prebuild --clean
 
 # For bare React Native
-react-native link @k9o/react-native-matrix-crypto
+react-native link @k9o/react-native-fortress-crypto
 ```
 
 ### 6. Use in Your Code
 
 ```typescript
-import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
+import { MatrixCrypto } from "@k9o/react-native-fortress-crypto";
 
 // Initialize
 const crypto = MatrixCrypto.getInstance();
@@ -195,7 +195,7 @@ const decrypted = await crypto.decryptEvent("!room:example.com", encrypted);
 
 ## Architecture
 
-### Rust Core (matrix-crypto-core)
+### Rust Core (fortress-crypto-core)
 
 The Rust core uses UniFFI to expose a clean, type-safe interface:
 
@@ -212,7 +212,7 @@ impl MatrixCrypto {
 }
 ```
 
-### iOS Native Module (matrix-crypto-ios)
+### iOS Native Module (fortress-crypto-ios)
 
 Swift wrapper that bridges React Native to Rust:
 
@@ -225,7 +225,7 @@ public class MatrixCryptoBridge {
 }
 ```
 
-### Android Native Module (matrix-crypto-android)
+### Android Native Module (fortress-crypto-android)
 
 Kotlin wrapper with JNI bindings:
 
@@ -359,7 +359,7 @@ expo prebuild --clean
 For bare React Native:
 
 ```bash
-react-native link @k9o/react-native-matrix-crypto
+react-native link @k9o/react-native-fortress-crypto
 ```
 
 ## Integration with matrix-js-sdk
@@ -367,7 +367,7 @@ react-native link @k9o/react-native-matrix-crypto
 In your Matrix client:
 
 ```typescript
-import { MatrixCrypto } from "@k9o/react-native-matrix-crypto";
+import { MatrixCrypto } from "@k9o/react-native-fortress-crypto";
 import { createClient } from "matrix-js-sdk";
 
 // Initialize native crypto
@@ -394,21 +394,21 @@ const client = createClient({
 ### Unit Tests (Rust)
 
 ```bash
-cd matrix-crypto-core
+cd fortress-crypto-core
 cargo test --release
 ```
 
 ### Integration Tests (React Native)
 
 ```bash
-cd react-native-matrix-crypto
+cd react-native-fortress-crypto
 npm test
 ```
 
 ### Performance Benchmarks
 
 ```bash
-cd react-native-matrix-crypto
+cd react-native-fortress-crypto
 npm run benchmark
 ```
 
@@ -444,9 +444,9 @@ Contributions welcome! Please:
 
 ## Support
 
-- **Issues**: https://github.com/techscorpion-dev/matrix-crypto-bridge/issues
-- **Discussions**: https://github.com/techscorpion-dev/matrix-crypto-bridge/discussions
-- **Matrix Chat**: #matrix-crypto-bridge:matrix.org
+- **Issues**: https://github.com/techscorpion-dev/fortress-crypto-bridge/issues
+- **Discussions**: https://github.com/techscorpion-dev/fortress-crypto-bridge/discussions
+- **Fortress**: #fortress-crypto-bridge:matrix.org
 
 ## Roadmap
 

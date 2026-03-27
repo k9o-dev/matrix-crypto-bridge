@@ -11,8 +11,8 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
-RUST_DIR="$PROJECT_ROOT/matrix-crypto-core"
-IOS_DIR="$PROJECT_ROOT/matrix-crypto-ios"
+RUST_DIR="$PROJECT_ROOT/fortress-crypto-core"
+IOS_DIR="$PROJECT_ROOT/fortress-crypto-ios"
 BUILD_DIR="$IOS_DIR/build"
 
 echo -e "${GREEN}Matrix Crypto Bridge - iOS Build Script${NC}"
@@ -87,7 +87,7 @@ echo -e "${GREEN}✓ Generated Swift bindings${NC}"
 echo ""
 echo -e "${YELLOW}Creating universal library...${NC}"
 
-# Use the workspace target directory (one level up from matrix-crypto-core)
+# Use the workspace target directory (one level up from fortress-crypto-core)
 WORKSPACE_TARGET="$PROJECT_ROOT/target"
 DEVICE_LIB="$WORKSPACE_TARGET/aarch64-apple-ios/release/libmatrix_crypto_core.a"
 SIMULATOR_LIB="$WORKSPACE_TARGET/x86_64-apple-ios/release/libmatrix_crypto_core.a"

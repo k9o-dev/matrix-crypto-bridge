@@ -6,7 +6,7 @@ on:
     tags: ["v*"]
     paths:
       - "matrix-crypto-core/**"
-      - "matrix-crypto-ios/**"
+      - "fortress-crypto-ios/**"
       - "build-scripts/**"
   pull_request:
     branches: [main, master]
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ios-xcframework
-          path: matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/
+          path: fortress-crypto-ios/build/MatrixCryptoBridge.xcframework/
           retention-days: 30
 
       - name: Create Release (on tag)
@@ -46,8 +46,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/**
-            matrix-crypto-ios/generated/**
+            fortress-crypto-ios/build/MatrixCryptoBridge.xcframework/**
+            fortress-crypto-ios/generated/**
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

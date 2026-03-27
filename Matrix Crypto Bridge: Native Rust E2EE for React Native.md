@@ -54,7 +54,7 @@ matrix-crypto-bridge/
 │   ├── uniffi.toml                  # UniFFI configuration
 │   └── build.rs                     # Build script
 │
-├── matrix-crypto-ios/               # iOS native module
+├── fortress-crypto-ios/               # iOS native module
 │   ├── MatrixCryptoBridge.swift     # Swift wrapper
 │   ├── RNMatrixCrypto.swift         # React Native bridge
 │   ├── build-ios.sh                 # iOS build script
@@ -175,7 +175,7 @@ cargo build --release --target aarch64-linux-android
 cd matrix-crypto-core
 
 # Generate Swift bindings
-uniffi-bindgen generate src/lib.rs --language swift --out-dir ../matrix-crypto-ios/
+uniffi-bindgen generate src/lib.rs --language swift --out-dir ../fortress-crypto-ios/
 
 # Generate Kotlin bindings
 uniffi-bindgen generate src/lib.rs --language kotlin --out-dir ../matrix-crypto-android/
@@ -184,7 +184,7 @@ uniffi-bindgen generate src/lib.rs --language kotlin --out-dir ../matrix-crypto-
 ### Build iOS Module
 
 ```bash
-cd matrix-crypto-ios
+cd fortress-crypto-ios
 ./build-ios.sh
 
 # Or manually:

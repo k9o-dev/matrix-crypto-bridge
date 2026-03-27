@@ -1,5 +1,5 @@
 [workspace]
-members = ["matrix-crypto-core"]
+members = ["fortress-crypto-core"]
 resolver = "2"
 
 [workspace.package]
@@ -7,4 +7,4 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Matrix Chat Contributors"]
 license = "Apache-2.0"
-repository = "https://github.com/techscorpion-dev/matrix-crypto-bridge"
+repository = "https://github.com/techscorpion-dev/fortress-crypto-bridge"
