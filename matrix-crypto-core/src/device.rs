@@ -1,7 +1,5 @@
-use uniffi::Record;
-
 /// Information about a device
-#[derive(Debug, Clone, Record)]
+#[derive(Debug, Clone)]
 pub struct DeviceInfo {
     /// The device ID
     pub device_id: String,
@@ -26,7 +24,7 @@ pub struct DeviceInfo {
 }
 
 /// A pair of emoji for SAS verification
-#[derive(Debug, Clone, Record)]
+#[derive(Debug, Clone)]
 pub struct EmojiSASPair {
     /// The emoji character
     pub emoji: String,
@@ -36,7 +34,7 @@ pub struct EmojiSASPair {
 }
 
 /// The state of a device verification
-#[derive(Debug, Clone, Record)]
+#[derive(Debug, Clone)]
 pub struct VerificationState {
     /// Unique identifier for this verification
     pub verification_id: String,
@@ -58,7 +56,7 @@ pub struct VerificationState {
 }
 
 /// Encryption algorithm information
-#[derive(Debug, Clone, Record)]
+#[derive(Debug, Clone)]
 pub struct EncryptionAlgorithm {
     /// The algorithm identifier (e.g., "m.megolm.v1.aes-sha2")
     pub algorithm: String,
@@ -71,7 +69,7 @@ pub struct EncryptionAlgorithm {
 }
 
 /// Room encryption state
-#[derive(Debug, Clone, Record)]
+#[derive(Debug, Clone)]
 pub struct RoomEncryptionState {
     /// The room ID
     pub room_id: String,
@@ -90,7 +88,7 @@ pub struct RoomEncryptionState {
 }
 
 /// User device list
-#[derive(Debug, Clone, Record)]
+#[derive(Debug, Clone)]
 pub struct UserDevices {
     /// The user ID
     pub user_id: String,

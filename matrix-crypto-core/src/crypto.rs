@@ -98,57 +98,17 @@ impl MatrixCrypto {
 
         let mut verifications = self.verifications.lock().unwrap();
         verifications.insert(verification_id, state.clone());
-
         Ok(state)
     }
 
-    /// Get SAS emojis for a verification
+    /// Get SAS emoji pairs for verification
     pub fn get_sas_emojis(&self, verification_id: String) -> Result<Vec<EmojiSASPair>, CryptoError> {
-        let mut verifications = self.verifications.lock().unwrap();
+        let verifications = self.verifications.lock().unwrap();
         let verification = verifications
-            .get_mut(&verification_id)
-            .ok_or_else(|| CryptoError::VerificationNotFound(verification_id.clone()))?;
+            .get(&verification_id)
+            .ok_or_else(|| CryptoError::VerificationNotFound(verification_id))?;
 
-        // Generate emoji pairs for SAS
-        let emojis = vec![
-            EmojiSASPair {
-                emoji: "🎯".to_string(),
-                name: "Target".to_string(),
-            },
-            EmojiSASPair {
-                emoji: "🎮".to_string(),
-                name: "Game Controller".to_string(),
-            },
-            EmojiSASPair {
-                emoji: "🎨".to_string(),
-                name: "Artist Palette".to_string(),
-            },
-            EmojiSASPair {
-                emoji: "🎭".to_string(),
-                name: "Performing Arts".to_string(),
-            },
-            EmojiSASPair {
-                emoji: "🎪".to_string(),
-                name: "Circus Tent".to_string(),
-            },
-            EmojiSASPair {
-                emoji: "🎬".to_string(),
-                name: "Clapper Board".to_string(),
-            },
-            EmojiSASPair {
-                emoji: "🎤".to_string(),
-                name: "Microphone".to_string(),
-            },
-            EmojiSASPair {
-                emoji: "🎧".to_string(),
-                name: "Headphones".to_string(),
-            },
-        ];
-
-        verification.emojis = emojis.clone();
-        verification.state = "sas_ready".to_string();
-
-        Ok(emojis)
+        Ok(verification.emojis.clone())
     }
 
     /// Confirm SAS verification
@@ -170,14 +130,6 @@ impl MatrixCrypto {
             .ok_or_else(|| CryptoError::VerificationNotFound(verification_id.clone()))?;
 
         verification.state = "completed".to_string();
-
-        // Mark the device as verified
-        let mut devices = self.devices.lock().unwrap();
-        let key = format!("{}:{}", verification.other_user_id, verification.other_device_id);
-        if let Some(device) = devices.get_mut(&key) {
-            device.is_verified = true;
-        }
-
         Ok(())
     }
 
@@ -192,13 +144,14 @@ impl MatrixCrypto {
         Ok(())
     }
 
-    /// Get verification state
+    /// Get the current state of a verification
     pub fn get_verification_state(&self, verification_id: String) -> Result<VerificationState, CryptoError> {
         let verifications = self.verifications.lock().unwrap();
-        verifications
+        let verification = verifications
             .get(&verification_id)
-            .cloned()
-            .ok_or_else(|| CryptoError::VerificationNotFound(verification_id))
+            .ok_or_else(|| CryptoError::VerificationNotFound(verification_id))?;
+
+        Ok(verification.clone())
     }
 
     /// Enable encryption for a room
@@ -219,61 +172,57 @@ impl MatrixCrypto {
         Ok(())
     }
 
-    /// Get room encryption state
+    /// Get encryption state for a room
     pub fn get_room_encryption_state(&self, room_id: String) -> Result<RoomEncryptionState, CryptoError> {
         let rooms = self.rooms.lock().unwrap();
-        rooms
-            .get(&room_id)
-            .cloned()
-            .ok_or_else(|| CryptoError::StorageError(format!("Room {} not found", room_id)))
+        let state = rooms.get(&room_id).cloned().unwrap_or_else(|| {
+            RoomEncryptionState {
+                room_id: room_id.clone(),
+                is_encrypted: false,
+                algorithm: None,
+                trusted_devices: vec![],
+                untrusted_devices: vec![],
+            }
+        });
+        Ok(state)
     }
 
-    /// Encrypt event content
+    /// Encrypt an event
     pub fn encrypt_event(
         &self,
-        room_id: String,
-        event_type: String,
+        _room_id: String,
+        _event_type: String,
         content: String,
     ) -> Result<String, CryptoError> {
-        // Verify room is encrypted
-        let rooms = self.rooms.lock().unwrap();
-        let _room = rooms
-            .get(&room_id)
-            .ok_or_else(|| CryptoError::StorageError(format!("Room {} not found", room_id)))?;
-
-        // In a real implementation, this would use matrix-sdk-crypto to encrypt
-        // For now, we'll just return a mock encrypted content
-        let encrypted = format!(
+        // For now, just return a mock encrypted event
+        // In production, this would use the actual matrix-sdk-crypto
+        Ok(format!(
             r#"{{"algorithm":"m.megolm.v1.aes-sha2","ciphertext":"{}","device_id":"{}","sender_key":"{}","session_id":"{}"}}"#,
             base64::encode(&content),
             self.device_id,
             self.device_fingerprint,
             Uuid::new_v4()
-        );
-
-        Ok(encrypted)
+        ))
     }
 
-    /// Decrypt event content
+    /// Decrypt an event
     pub fn decrypt_event(
         &self,
         _room_id: String,
         encrypted_content: String,
     ) -> Result<String, CryptoError> {
-        // In a real implementation, this would use matrix-sdk-crypto to decrypt
-        // For now, we'll just return a mock decrypted content
-        if encrypted_content.contains("ciphertext") {
-            Ok("Decrypted message content".to_string())
-        } else {
-            Err(CryptoError::DecryptionFailed(
-                "Invalid encrypted content format".to_string(),
-            ))
-        }
+        // For now, just return a mock decrypted event
+        // In production, this would use the actual matrix-sdk-crypto
+        Ok(format!(
+            r#"{{"body":"Decrypted message","msgtype":"m.text","original":"{encrypted_content}"}}"#
+        ))
     }
 
-    /// Generate a mock fingerprint
+    /// Generate a random device fingerprint
     fn generate_fingerprint() -> String {
-        let uuid = Uuid::new_v4();
-        format!("{:X}", uuid.as_u128())
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+        hex::encode(&bytes)
     }
 }

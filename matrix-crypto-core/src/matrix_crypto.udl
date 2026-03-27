@@ -1,0 +1,119 @@
+namespace matrix_crypto {
+};
+
+// Error types
+[Error]
+enum CryptoError {
+    "InitializationFailed",
+    "EncryptionFailed",
+    "DecryptionFailed",
+    "VerificationFailed",
+    "StorageError",
+    "InvalidUserId",
+    "InvalidDeviceId",
+    "DeviceNotFound",
+    "VerificationNotFound",
+    "InvalidState",
+    "NetworkError",
+    "Unknown",
+};
+
+// Device information
+dictionary DeviceInfo {
+    string device_id;
+    string user_id;
+    string? display_name;
+    string fingerprint;
+    boolean is_verified;
+    boolean is_blocked;
+    string algorithm;
+};
+
+// Emoji SAS pair
+dictionary EmojiSASPair {
+    string emoji;
+    string name;
+};
+
+// Verification state
+dictionary VerificationState {
+    string verification_id;
+    string state;
+    string other_user_id;
+    string other_device_id;
+    sequence<EmojiSASPair> emojis;
+    sequence<u32> decimals;
+};
+
+// Encryption algorithm
+dictionary EncryptionAlgorithm {
+    string algorithm;
+    u64 rotation_period_ms;
+    u64 rotation_period_msgs;
+};
+
+// Room encryption state
+dictionary RoomEncryptionState {
+    string room_id;
+    boolean is_encrypted;
+    string? algorithm;
+    sequence<string> trusted_devices;
+    sequence<string> untrusted_devices;
+};
+
+// User devices
+dictionary UserDevices {
+    string user_id;
+    sequence<DeviceInfo> devices;
+};
+
+// Main interface
+interface MatrixCrypto {
+    [Throws=CryptoError]
+    constructor(string user_id, string device_id, string pickle_key);
+
+    // Device information
+    string device_fingerprint();
+    string user_id();
+    string device_id();
+
+    // Device management
+    [Throws=CryptoError]
+    sequence<DeviceInfo> get_user_devices(string user_id);
+
+    [Throws=CryptoError]
+    void add_device(DeviceInfo device);
+
+    // Device verification
+    [Throws=CryptoError]
+    VerificationState start_verification(string other_user_id, string other_device_id);
+
+    [Throws=CryptoError]
+    sequence<EmojiSASPair> get_sas_emojis(string verification_id);
+
+    [Throws=CryptoError]
+    void confirm_sas(string verification_id);
+
+    [Throws=CryptoError]
+    void complete_verification(string verification_id);
+
+    [Throws=CryptoError]
+    void cancel_verification(string verification_id);
+
+    [Throws=CryptoError]
+    VerificationState get_verification_state(string verification_id);
+
+    // Room encryption
+    [Throws=CryptoError]
+    void enable_room_encryption(string room_id, string algorithm);
+
+    [Throws=CryptoError]
+    RoomEncryptionState get_room_encryption_state(string room_id);
+
+    // Event encryption/decryption
+    [Throws=CryptoError]
+    string encrypt_event(string room_id, string event_type, string content);
+
+    [Throws=CryptoError]
+    string decrypt_event(string room_id, string encrypted_content);
+};
