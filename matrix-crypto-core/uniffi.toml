@@ -1,0 +1,5 @@
+[bindings.swift]
+package_name = "MatrixCryptoBridge"
+
+[bindings.kotlin]
+package_name = "com.matrix.crypto"

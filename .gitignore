@@ -1,0 +1,44 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# iOS
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcframework/
+*.framework/
+build/
+DerivedData/
+
+# Android
+.gradle/
+local.properties
+*.iml
+.idea/
+build/
+*.apk
+*.aar
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+lib/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files
+matrix-crypto-ios/generated/
+matrix-crypto-android/generated/

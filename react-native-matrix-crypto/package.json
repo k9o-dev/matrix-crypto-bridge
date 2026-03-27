@@ -1,0 +1,39 @@
+{
+  "name": "@matrix-chat/react-native-crypto",
+  "version": "0.1.0",
+  "description": "Native Rust crypto bridge for React Native Matrix client",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src",
+    "ios",
+    "android",
+    "react-native-matrix-crypto.podspec"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "matrix",
+    "crypto",
+    "e2ee",
+    "encryption",
+    "react-native"
+  ],
+  "author": "Matrix Chat Contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/techscorpion-dev/matrix-crypto-bridge.git"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.71.0"
+  },
+  "devDependencies": {
+    "@types/react-native": "^0.73.0",
+    "typescript": "^5.3.3"
+  }
+}
