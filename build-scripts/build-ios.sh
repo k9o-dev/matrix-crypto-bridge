@@ -38,8 +38,8 @@ fi
 
 # Check if uniffi-bindgen is installed
 if ! command -v uniffi-bindgen &> /dev/null; then
-    echo -e "${YELLOW}Installing uniffi-bindgen...${NC}"
-    cargo install uniffi_bindgen
+    echo -e "${YELLOW}Installing uniffi with CLI support...${NC}"
+    cargo install uniffi --features=cli
 fi
 
 # Ensure iOS targets are installed
@@ -128,8 +128,9 @@ if [ -d "$XCFRAMEWORK_PATH" ]; then
 fi
 
 # Create temporary framework directories for xcodebuild
-TEMP_FRAMEWORK_DEVICE="$BUILD_DIR/temp/MatrixCryptoBridge-device.framework"
-TEMP_FRAMEWORK_SIMULATOR="$BUILD_DIR/temp/MatrixCryptoBridge-simulator.framework"
+# Note: xcodebuild expects the framework name to match the binary name
+TEMP_FRAMEWORK_DEVICE="$BUILD_DIR/temp/device/MatrixCryptoBridge.framework"
+TEMP_FRAMEWORK_SIMULATOR="$BUILD_DIR/temp/simulator/MatrixCryptoBridge.framework"
 
 mkdir -p "$BUILD_DIR/temp"
 mkdir -p "$TEMP_FRAMEWORK_DEVICE/Headers"

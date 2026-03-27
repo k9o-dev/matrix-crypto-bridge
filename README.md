@@ -83,8 +83,8 @@ rustup target add aarch64-apple-ios x86_64-apple-ios
 # Android targets (works on macOS, Linux, and Windows)
 rustup target add aarch64-linux-android armv7-linux-android x86_64-linux-android
 
-# Install UniFFI bindgen
-cargo install uniffi_bindgen
+# Install UniFFI with CLI support
+cargo install uniffi --features=cli
 ```
 
 ### 3. Build for iOS
@@ -308,7 +308,7 @@ git push origin v0.1.0
 ### "uniffi-bindgen not found"
 
 ```bash
-cargo install uniffi_bindgen
+cargo install uniffi --features=cli
 ```
 
 ### "Android NDK not found"

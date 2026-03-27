@@ -147,7 +147,7 @@ if command -v uniffi-bindgen &> /dev/null; then
         2>&1 | grep -E "Generating|error" || true
 else
     echo -e "${YELLOW}Note: uniffi-bindgen not found, skipping Kotlin binding generation${NC}"
-    echo "Install with: cargo install uniffi_bindgen"
+    echo "Install with: cargo install uniffi --features=cli"
 fi
 
 # Copy libraries to Android project
