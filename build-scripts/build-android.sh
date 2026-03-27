@@ -112,7 +112,7 @@ rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 [target.armv7-linux-androideabi]
 ar = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/llvm-ar"
-linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/armv7a-linux-android21-clang"
+linker = "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/${HOST_PLATFORM}-x86_64/bin/armv7a-linux-androideabi21-clang"
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 [target.x86_64-linux-android]
@@ -179,12 +179,17 @@ mkdir -p "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a"
 mkdir -p "$ANDROID_DIR/src/main/jniLibs/x86_64"
 
 echo "Copying aarch64 library..."
+echo "Looking for: $RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so"
+echo "Available files:"
+ls -lah "$RUST_DIR/target/aarch64-linux-android/release/" 2>/dev/null | grep -E "libmatrix|total" || echo "No matrix files found"
 if [ -f "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
     cp "$RUST_DIR/target/aarch64-linux-android/release/libmatrix_crypto_core.so" \
        "$ANDROID_DIR/src/main/jniLibs/arm64-v8a/"
     echo -e "${GREEN}✓ Copied arm64-v8a library${NC}"
 else
     echo -e "${RED}✗ arm64-v8a library not found${NC}"
+    echo "Checking if .a (static) library exists:"
+    ls -lah "$RUST_DIR/target/aarch64-linux-android/release/"*matrix* 2>/dev/null || echo "No matrix libraries found"
     exit 1
 fi
 
