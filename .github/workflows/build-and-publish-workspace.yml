@@ -243,6 +243,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Publish MatrixCryptoBridge to CocoaPods
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "Publishing MatrixCryptoBridge pod to CocoaPods..."
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Version: $VERSION"
+
+          # Install CocoaPods if not already installed
+          gem install cocoapods
+
+          # Lint the podspec
+          pod spec lint MatrixCryptoBridge.podspec --allow-warnings
+
+          # Publish to CocoaPods
+          pod trunk push MatrixCryptoBridge.podspec --allow-warnings
+
+          echo "✓ MatrixCryptoBridge published to CocoaPods"
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
   publish-npm:
     name: Publish to NPM
     needs: [create-distribution, publish-release]
