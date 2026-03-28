@@ -181,12 +181,19 @@ build_android() {
         fi
     done
     
+    # Verify cargo-ndk is installed
+    if ! command_exists cargo-ndk; then
+        print_warning "cargo-ndk not found in PATH, installing..."
+        cargo install cargo-ndk
+    fi
+    
     for target in "${android_targets[@]}"; do
         print_subsection "Building for $target..."
         
         cd "$PROJECT_ROOT"
         # Use cargo-ndk for proper Android NDK integration
-        if cargo ndk --target "$target" build -p matrix-crypto-android --release; then
+        print_info "Invoking: cargo-ndk -t $target -o $WORKSPACE_TARGET/$target/release build -p matrix-crypto-android --release"
+        if cargo-ndk -t "$target" -o "$WORKSPACE_TARGET/$target/release" build -p matrix-crypto-android --release; then
             print_success "Build succeeded for $target"
             
             # Copy the shared library
