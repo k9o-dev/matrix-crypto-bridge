@@ -15,4 +15,5 @@ uniffi = { workspace = true, features = ["build"] }
 
 [lib]
 # Android requires cdylib (.so) for JNI dynamic linking
-crate-type = ["cdylib"]
+# Also include rlib for intermediate compilation
+crate-type = ["cdylib", "rlib"]
