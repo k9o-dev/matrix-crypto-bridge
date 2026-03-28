@@ -135,14 +135,34 @@ build_android() {
     # Check for NDK
     if [ -z "$ANDROID_NDK_HOME" ]; then
         print_warning "ANDROID_NDK_HOME not set - attempting to use default locations"
-        if [ -d "$HOME/Android/Sdk/ndk" ]; then
+        
+        # Try GitHub Actions location first
+        if [ -d "/opt/hostedtoolcache/ndk" ]; then
+            export ANDROID_NDK_HOME="/opt/hostedtoolcache/ndk/$(ls -1 /opt/hostedtoolcache/ndk | tail -1)"
+            print_info "Found NDK at GitHub Actions location: $ANDROID_NDK_HOME"
+        # Try standard Android SDK location
+        elif [ -d "$HOME/Android/Sdk/ndk" ]; then
             export ANDROID_NDK_HOME="$HOME/Android/Sdk/ndk/$(ls -1 $HOME/Android/Sdk/ndk | tail -1)"
-            print_info "Found NDK at: $ANDROID_NDK_HOME"
+            print_info "Found NDK at standard location: $ANDROID_NDK_HOME"
         else
-            print_error "ANDROID_NDK_HOME not set and NDK not found in standard location"
+            print_error "ANDROID_NDK_HOME not set and NDK not found in standard locations"
+            print_info "Checked locations:"
+            print_info "  - /opt/hostedtoolcache/ndk (GitHub Actions)"
+            print_info "  - $HOME/Android/Sdk/ndk (Standard Android SDK)"
             print_info "Please set ANDROID_NDK_HOME environment variable"
             return 1
         fi
+    fi
+    
+    # Verify NDK installation
+    if [ ! -d "$ANDROID_NDK_HOME" ]; then
+        print_error "ANDROID_NDK_HOME points to non-existent directory: $ANDROID_NDK_HOME"
+        return 1
+    fi
+    
+    print_info "Using NDK: $ANDROID_NDK_HOME"
+    if [ -f "$ANDROID_NDK_HOME/source.properties" ]; then
+        print_info "NDK version: $(grep 'Pkg.Revision' $ANDROID_NDK_HOME/source.properties)"
     fi
     
     for target in "${android_targets[@]}"; do
