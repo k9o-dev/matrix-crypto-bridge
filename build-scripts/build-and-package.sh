@@ -182,9 +182,13 @@ if [ "$BUILD_ANDROID" = true ] || [ "$BUILD_ALL" = true ]; then
     if [ -f "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
         cp "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" \
            "$PACKAGE_DIR/android/src/main/jniLibs/arm64-v8a/"
-        print_success "Copied arm64-v8a library"
+        print_success "Copied arm64-v8a library (.so)"
+    elif [ -f "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.a" ]; then
+        cp "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.a" \
+           "$PACKAGE_DIR/android/src/main/jniLibs/arm64-v8a/"
+        print_success "Copied arm64-v8a library (.a)"
     else
-        print_error "arm64-v8a library not found"
+        print_error "arm64-v8a library not found (neither .so nor .a)"
         exit 1
     fi
     
@@ -192,9 +196,13 @@ if [ "$BUILD_ANDROID" = true ] || [ "$BUILD_ALL" = true ]; then
     if [ -f "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
         cp "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
            "$PACKAGE_DIR/android/src/main/jniLibs/armeabi-v7a/"
-        print_success "Copied armeabi-v7a library"
+        print_success "Copied armeabi-v7a library (.so)"
+    elif [ -f "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.a" ]; then
+        cp "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.a" \
+           "$PACKAGE_DIR/android/src/main/jniLibs/armeabi-v7a/"
+        print_success "Copied armeabi-v7a library (.a)"
     else
-        print_error "armeabi-v7a library not found"
+        print_error "armeabi-v7a library not found (neither .so nor .a)"
         exit 1
     fi
     
@@ -202,9 +210,13 @@ if [ "$BUILD_ANDROID" = true ] || [ "$BUILD_ALL" = true ]; then
     if [ -f "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
         cp "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" \
            "$PACKAGE_DIR/android/src/main/jniLibs/x86_64/"
-        print_success "Copied x86_64 library"
+        print_success "Copied x86_64 library (.so)"
+    elif [ -f "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.a" ]; then
+        cp "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.a" \
+           "$PACKAGE_DIR/android/src/main/jniLibs/x86_64/"
+        print_success "Copied x86_64 library (.a)"
     else
-        print_error "x86_64 library not found"
+        print_error "x86_64 library not found (neither .so nor .a)"
         exit 1
     fi
     
