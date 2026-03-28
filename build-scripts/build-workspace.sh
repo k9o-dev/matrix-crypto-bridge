@@ -136,8 +136,12 @@ build_android() {
     if [ -z "$ANDROID_NDK_HOME" ]; then
         print_warning "ANDROID_NDK_HOME not set - attempting to use default locations"
         
-        # Try GitHub Actions location first
-        if [ -d "/opt/hostedtoolcache/ndk" ]; then
+        # Try ANDROID_SDK_ROOT first (set by setup-ndk action)
+        if [ ! -z "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
+            export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$(ls -1 $ANDROID_SDK_ROOT/ndk | tail -1)"
+            print_info "Found NDK via ANDROID_SDK_ROOT: $ANDROID_NDK_HOME"
+        # Try GitHub Actions location
+        elif [ -d "/opt/hostedtoolcache/ndk" ]; then
             export ANDROID_NDK_HOME="/opt/hostedtoolcache/ndk/$(ls -1 /opt/hostedtoolcache/ndk | tail -1)"
             print_info "Found NDK at GitHub Actions location: $ANDROID_NDK_HOME"
         # Try standard Android SDK location
@@ -147,6 +151,7 @@ build_android() {
         else
             print_error "ANDROID_NDK_HOME not set and NDK not found in standard locations"
             print_info "Checked locations:"
+            print_info "  - ANDROID_SDK_ROOT/ndk (setup-ndk action)"
             print_info "  - /opt/hostedtoolcache/ndk (GitHub Actions)"
             print_info "  - $HOME/Android/Sdk/ndk (Standard Android SDK)"
             print_info "Please set ANDROID_NDK_HOME environment variable"
