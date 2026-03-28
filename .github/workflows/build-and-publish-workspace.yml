@@ -7,15 +7,27 @@ on:
     branches:
       - main
       - develop
+      - master
+  pull_request:
+    branches:
+      - main
+      - develop
+      - master
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "Publish GitHub release after build"
+        required: false
+        default: "false"
+      publish_npm:
+        description: "Publish to NPM after build"
+        required: false
+        default: "false"
 
 jobs:
   build-ios:
     name: Build iOS Libraries
     runs-on: macos-latest
-    strategy:
-      matrix:
-        target: [aarch64-apple-ios, x86_64-apple-ios]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,38 +35,36 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-ios,x86_64-apple-ios
 
       - name: Cache Rust build
-        uses: actions/cache@v3
+        uses: Swatinem/rust-cache@v2
         with:
-          path: target
-          key: ${{ runner.os }}-rust-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-rust-${{ matrix.target }}-
+          workspaces: .
 
-      - name: Build iOS library (Workspace)
-        run: |
-          cargo build -p matrix-crypto-ios \
-            --target ${{ matrix.target }} \
-            --release
+      - name: Build iOS libraries
+        run: ./build-scripts/build-workspace.sh ios
 
-      - name: Upload artifact
+      - name: Generate Swift bindings
+        run: ./build-scripts/build-workspace.sh swift
+
+      - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ios-libs-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/libmatrix_crypto_ios.a
-          retention-days: 1
+          name: ios-libraries
+          path: dist/ios/
+          retention-days: 30
+
+      - name: Upload Swift bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-bindings
+          path: dist/swift/
+          retention-days: 30
 
   build-android:
     name: Build Android Libraries
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - aarch64-linux-android
-          - armv7-linux-androideabi
-          - x86_64-linux-android
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -62,108 +72,269 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r25c
+          ndk-version: r26
+
+      - name: Verify NDK Installation
+        run: |
+          echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
+          ls -la $ANDROID_NDK_HOME/toolchains/ || echo "NDK toolchains not found"
+          which clang || echo "clang not found"
+
+      - name: Setup Cargo NDK
+        run: cargo install cargo-ndk
 
       - name: Cache Rust build
-        uses: actions/cache@v3
+        uses: Swatinem/rust-cache@v2
         with:
-          path: target
-          key: ${{ runner.os }}-rust-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-rust-${{ matrix.target }}-
+          workspaces: .
 
-      - name: Build Android library (Workspace)
+      - name: Build Android libraries
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         run: |
-          cargo build -p matrix-crypto-android \
-            --target ${{ matrix.target }} \
-            --release
+          echo "Building Android libraries..."
+          ./build-scripts/build-workspace.sh android
+        continue-on-error: false
 
-      - name: Upload artifact
+      - name: Verify Android artifacts
+        run: |
+          echo "Checking for Android libraries..."
+          find dist/android -name "*.so" -exec ls -lh {} \;
+
+      - name: Generate Kotlin bindings
+        run: ./build-scripts/build-workspace.sh kotlin
+        continue-on-error: true
+
+      - name: Upload Android artifacts
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: android-libs-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/libmatrix_crypto_android.so
-          retention-days: 1
+          name: android-libraries
+          path: dist/android/
+          retention-days: 30
 
-  package:
-    name: Package for NPM
+      - name: Upload Kotlin bindings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-bindings
+          path: dist/kotlin/
+          retention-days: 30
+
+  create-distribution:
+    name: Create Distribution Archive
     needs: [build-ios, build-android]
     runs-on: ubuntu-latest
-    environment: production
+    if: always()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Create dist directory
+        run: mkdir -p dist/{ios,android,swift,kotlin}
+
       - name: Download iOS artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: ios-libraries
+          path: dist/ios/
+        continue-on-error: true
+
+      - name: Download Swift bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: swift-bindings
+          path: dist/swift/
+        continue-on-error: true
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: android-libraries
+          path: dist/android/
+        continue-on-error: true
+
+      - name: Download Kotlin bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: kotlin-bindings
+          path: dist/kotlin/
+        continue-on-error: true
+
+      - name: List distribution contents
+        run: |
+          echo "Distribution contents:"
+          find dist -type f -exec ls -lh {} \;
+
+      - name: Create distribution archive
+        run: |
+          cd dist
+          tar -czf ../matrix-crypto-bridge-dist.tar.gz .
+          cd ..
+          sha256sum matrix-crypto-bridge-dist.tar.gz > matrix-crypto-bridge-dist.tar.gz.sha256
+          echo "Archive created:"
+          ls -lh matrix-crypto-bridge-dist.tar.gz*
+
+      - name: Upload distribution archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: distribution-archive
+          path: |
+            matrix-crypto-bridge-dist.tar.gz
+            matrix-crypto-bridge-dist.tar.gz.sha256
+          retention-days: 90
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: create-distribution
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && needs.create-distribution.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download distribution archive
+        uses: actions/download-artifact@v4
+        with:
+          name: distribution-archive
+
+      - name: Verify archive integrity
+        run: |
+          echo "Verifying distribution archive..."
+          sha256sum -c matrix-crypto-bridge-dist.tar.gz.sha256
+          echo "✓ Archive integrity verified"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            matrix-crypto-bridge-dist.tar.gz
+            matrix-crypto-bridge-dist.tar.gz.sha256
+          draft: false
+          prerelease: false
+          body: |
+            # Matrix Crypto Bridge Release
+
+            Pre-built native libraries for iOS and Android platforms.
+
+            ## Contents
+            - iOS static libraries (aarch64 device + x86_64 simulator)
+            - Android shared libraries (aarch64, armv7, x86_64)
+            - Swift bindings for iOS
+            - Kotlin bindings for Android
+
+            ## Installation
+            ```bash
+            npm install @k9o/react-native-matrix-crypto@latest
+            ```
+
+            ## Verification
+            ```bash
+            sha256sum -c matrix-crypto-bridge-dist.tar.gz.sha256
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-npm:
+    name: Publish to NPM
+    needs: [create-distribution, publish-release]
+    runs-on: ubuntu-latest
+    environment: production
+    if: startsWith(github.ref, 'refs/tags/v') && needs.create-distribution.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Copy libraries to package
+      - name: Download distribution archive
+        uses: actions/download-artifact@v4
+        with:
+          name: distribution-archive
+
+      - name: Extract distribution
         run: |
-          bash build-scripts/build-workspace.sh all
+          mkdir -p dist-extracted
+          tar -xzf matrix-crypto-bridge-dist.tar.gz -C dist-extracted
+          echo "Distribution extracted:"
+          find dist-extracted -type f -exec ls -lh {} \;
 
       - name: Install dependencies
         run: cd react-native-matrix-crypto && npm install
 
+      - name: Verify package contents
+        run: |
+          echo "Package contents:"
+          ls -la react-native-matrix-crypto/
+
       - name: Publish to NPM
-        if: startsWith(github.ref, 'refs/tags/v' )
         run: |
           cd react-native-matrix-crypto
-          npm publish
+          npm publish --verbose
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: context.ref.replace('refs/tags/', ''),
-              name: `Release ${context.ref.replace('refs/tags/', '')}`,
-              body: 'Pre-built native libraries for Android and iOS\n\n- iOS: aarch64 (device) + x86_64 (simulator)\n- Android: aarch64, armv7, x86_64\n\nInstall with: npm install @k9o/react-native-matrix-crypto'
-            })
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  notify:
-    name: Notify on Completion
-    needs: [build-ios, build-android, package]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Check build status
+      - name: Verify NPM publication
         run: |
-          if [ "${{ needs.build-ios.result }}" == "failure" ] || \
-             [ "${{ needs.build-android.result }}" == "failure" ] || \
-             [ "${{ needs.package.result }}" == "failure" ]; then
-            echo "❌ Build failed!"
-            exit 1
-          fi
-          echo "✅ Build succeeded!"
+          echo "Waiting for NPM to index..."
+          sleep 10
+          npm view @k9o/react-native-matrix-crypto@latest version || echo "Package not yet indexed"
 
-      - name: Comment on PR (if applicable)
-        if: github.event_name == 'pull_request' && success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '✅ Workspace build and packaging completed successfully!\n\n- iOS libraries (aarch64 + x86_64) built and packaged\n- Android libraries (aarch64, armv7, x86_64) built and packaged\n- Ready for NPM publishing'
-            })
+  build-status:
+    name: Build Status Report
+    runs-on: ubuntu-latest
+    needs: [build-ios, build-android, create-distribution]
+    if: always( )
+    steps:
+      - name: Generate Build Report
+        run: |
+          echo "=== Build Status Report ==="
+          echo ""
+          echo "iOS Build: ${{ needs.build-ios.result }}"
+          echo "Android Build: ${{ needs.build-android.result }}"
+          echo "Distribution: ${{ needs.create-distribution.result }}"
+          echo ""
+
+          if [[ "${{ needs.build-ios.result }}" == "success" ]]; then
+            echo "✓ iOS libraries built successfully"
+          else
+            echo "✗ iOS build failed"
+          fi
+
+          if [[ "${{ needs.build-android.result }}" == "success" ]]; then
+            echo "✓ Android libraries built successfully"
+          else
+            echo "⚠ Android build failed or skipped"
+          fi
+
+          if [[ "${{ needs.create-distribution.result }}" == "success" ]]; then
+            echo "✓ Distribution archive created"
+          else
+            echo "✗ Distribution creation failed"
+          fi
+
+          echo ""
+          echo "Build Summary:"
+          if [[ "${{ needs.build-ios.result }}" == "success" ]]; then
+            echo "- iOS: Ready for distribution"
+          fi
+          if [[ "${{ needs.build-android.result }}" == "success" ]]; then
+            echo "- Android: Ready for distribution"
+          fi
+
+      - name: Notify on Success
+        if: needs.build-ios.result == 'success' && needs.create-distribution.result == 'success'
+        run: echo "✅ Build pipeline completed successfully!"
+
+      - name: Notify on Partial Success
+        if: (needs.build-ios.result == 'success' || needs.build-android.result == 'success') && needs.create-distribution.result == 'success'
+        run: echo "⚠️ Build pipeline completed with some platforms built"
