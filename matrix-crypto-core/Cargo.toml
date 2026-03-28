@@ -21,11 +21,12 @@ rand = "0.8"
 hex = "0.4"
 
 [lib]
-# Generate both cdylib and staticlib for different platforms:
-# - Android: cdylib (.so) for JNI dynamic linking
-# - iOS: staticlib (.a) for static linking into app binary
-# Rust's build system will use the appropriate one based on the target
-crate-type = ["cdylib", "staticlib"]
+# Use staticlib as the primary crate type
+# Note: Rust doesn't support cdylib for cross-compilation targets (Android, iOS)
+# Instead, we produce static libraries that are linked by the native build systems:
+# - Android: Static libraries (.a) that Android NDK links and wraps in .so for JNI
+# - iOS: Static libraries (.a) that Xcode links directly into the app binary
+crate-type = ["staticlib"]
 
 [build-dependencies]
 uniffi = { version = "0.27", features = ["build"] }

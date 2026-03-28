@@ -3,15 +3,14 @@ fn main() {
     uniffi::generate_scaffolding("src/matrix_crypto.udl")
         .expect("Failed to generate UniFFI scaffolding");
     
-    // For Android targets, we need to use staticlib instead of cdylib
-    // because Rust doesn't support cdylib for cross-compilation targets.
-    // The Android build system will handle the dynamic linking through JNI.
+    // Determine the target platform
     let target = std::env::var("TARGET").unwrap_or_default();
     
     if target.contains("android") {
-        // Tell cargo to use staticlib for Android
-        // The build script will copy the .a files and the Android build system
-        // will handle creating the .so files through the NDK.
+        // Android: Use cdylib to generate .so files for JNI
         println!("cargo:rustc-cfg=android_target");
+    } else if target.contains("apple") && target.contains("ios") {
+        // iOS: Use staticlib to generate .a files for static linking
+        println!("cargo:rustc-cfg=ios_target");
     }
 }
