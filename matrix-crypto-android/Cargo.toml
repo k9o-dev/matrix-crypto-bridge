@@ -14,6 +14,6 @@ uniffi = { workspace = true }
 uniffi = { workspace = true, features = ["build"] }
 
 [lib]
-# Android: use staticlib which is properly supported
-# staticlib creates .a files that can be linked into Android apps
-crate-type = ["staticlib", "rlib"]
+# Android requires cdylib (.so) for JNI dynamic linking
+# cargo-ndk handles the compilation properly for Android targets
+crate-type = ["cdylib"]

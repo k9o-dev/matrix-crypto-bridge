@@ -196,24 +196,19 @@ build_android() {
         export ANDROID_NDK_HOME="$ANDROID_NDK_HOME"
         export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
         
-        # Set compiler variables for cargo
-        export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
-        export AR="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
-        export RANLIB="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
-        
-        # Use cargo build with target (cargo-ndk not needed with proper env vars)
-        print_info "Invoking: cargo build -p matrix-crypto-android --target $target --release"
-        if cargo build -p matrix-crypto-android --target "$target" --release; then
+        # Use cargo-ndk to build Android libraries with proper cdylib support
+        print_info "Invoking: cargo ndk -t $target build -p matrix-crypto-android --release"
+        if cargo ndk -t "$target" build -p matrix-crypto-android --release; then
             print_success "Build succeeded for $target"
             
-            # Copy the static library
-            local lib_file="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_android.a"
-            if verify_artifact "$lib_file" "Android static library ($target)"; then
+            # Copy the dynamic library (.so file)
+            local lib_file="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_android.so"
+            if verify_artifact "$lib_file" "Android shared library ($target)"; then
                 # Create ABI-specific directory
                 local abi_dir="$android_output_dir/lib/$target"
                 mkdir -p "$abi_dir"
-                cp "$lib_file" "$abi_dir/libmatrix_crypto_android.a"
-                print_success "Copied to $abi_dir/libmatrix_crypto_android.a"
+                cp "$lib_file" "$abi_dir/libmatrix_crypto_android.so"
+                print_success "Copied to $abi_dir/libmatrix_crypto_android.so"
             else
                 print_error "Failed to find library for $target"
                 return 1
