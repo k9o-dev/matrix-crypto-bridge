@@ -216,7 +216,7 @@ matrix-crypto-android/build/outputs/aar/
        repositories {
            maven {
                name = "GitHubPackages"
-               url = uri("https://maven.pkg.github.com/techscorpion-dev/fortress-crypto-bridge")
+               url = uri("https://maven.pkg.github.com/techscorpion-dev/matrix-crypto-bridge")
                credentials {
                    username = System.getenv("GITHUB_ACTOR")
                    password = System.getenv("GITHUB_TOKEN")
@@ -246,7 +246,7 @@ matrix-crypto-android/build/outputs/aar/
    ```gradle
    repositories {
        maven {
-           url = uri("https://maven.pkg.github.com/techscorpion-dev/fortress-crypto-bridge")
+           url = uri("https://maven.pkg.github.com/techscorpion-dev/matrix-crypto-bridge")
            credentials {
                username = System.getenv("GITHUB_ACTOR")
                password = System.getenv("GITHUB_TOKEN")
@@ -316,7 +316,7 @@ on:
 Add to your README.md:
 
 ```markdown
-![Build Android AAR](https://github.com/techscorpion-dev/fortress-crypto-bridge/actions/workflows/build-android-aar.yml/badge.svg)
+![Build Android AAR](https://github.com/techscorpion-dev/matrix-crypto-bridge/actions/workflows/build-android-aar.yml/badge.svg)
 ```
 
 ---

@@ -1,5 +1,5 @@
 {
-  "name": "@k9o/react-native-fortress-crypto",
+  "name": "@k9o/react-native-matrix-crypto",
   "version": "1.0.0",
   "description": "Native Rust crypto bridge for React Native Matrix client with End-to-End Encryption support",
   "main": "lib/index.js",
@@ -9,7 +9,7 @@
     "src",
     "ios",
     "android",
-    "react-native-fortress-crypto.podspec"
+    "react-native-matrix-crypto.podspec"
   ],
   "scripts": {
     "build": "tsc",
@@ -34,7 +34,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/k9o-dev/matrix-crypto-bridge.git",
-    "directory": "react-native-fortress-crypto"
+    "directory": "react-native-matrix-crypto"
   },
   "bugs": {
     "url": "https://github.com/k9o-dev/matrix-crypto-bridge/issues"

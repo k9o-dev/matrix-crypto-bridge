@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
-RUST_DIR="$PROJECT_ROOT/fortress-crypto-core"
+RUST_DIR="$PROJECT_ROOT/matrix-crypto-core"
 
 echo -e "${GREEN}Matrix Crypto Bridge - Rust Build Script${NC}"
 echo "Project root: $PROJECT_ROOT"

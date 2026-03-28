@@ -104,8 +104,8 @@ build:ios:
   
   artifacts:
     paths:
-      - fortress-crypto-ios/build/MatrixCryptoBridge.xcframework/
-      - fortress-crypto-ios/generated/
+      - matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/
+      - matrix-crypto-ios/generated/
     expire_in: 30 days
     when: always
   
@@ -139,7 +139,7 @@ package:artifacts:
     - echo "Packaging build artifacts..."
     - mkdir -p artifacts/android artifacts/ios
     - cp -r matrix-crypto-android/build/outputs/aar/* artifacts/android/ || true
-    - cp -r fortress-crypto-ios/build/MatrixCryptoBridge.xcframework artifacts/ios/ || true
+    - cp -r matrix-crypto-ios/build/MatrixCryptoBridge.xcframework artifacts/ios/ || true
     - echo "Artifacts packaged successfully"
     - ls -lah artifacts/
   
@@ -178,7 +178,7 @@ release:artifacts:
           url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-android/build/outputs/aar/matrix-crypto-android-debug.aar"
           link_type: other
         - name: "iOS XCFramework"
-          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/fortress-crypto-ios/build/MatrixCryptoBridge.xcframework"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-ios/build/MatrixCryptoBridge.xcframework"
           link_type: other
   
   only:

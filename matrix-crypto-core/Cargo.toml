@@ -1,5 +1,5 @@
 [package]
-name = "fortress-crypto-core"
+name = "matrix-crypto-core"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

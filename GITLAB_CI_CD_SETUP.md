@@ -146,8 +146,8 @@ build:ios:
   
   artifacts:
     paths:
-      - fortress-crypto-ios/build/MatrixCryptoBridge.xcframework/
-      - fortress-crypto-ios/generated/
+      - matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/
+      - matrix-crypto-ios/generated/
     expire_in: 30 days
     when: always
   
@@ -178,7 +178,7 @@ package:artifacts:
     - echo "Packaging build artifacts..."
     - mkdir -p artifacts/android artifacts/ios
     - cp -r matrix-crypto-android/build/outputs/aar/* artifacts/android/ || true
-    - cp -r fortress-crypto-ios/build/MatrixCryptoBridge.xcframework artifacts/ios/ || true
+    - cp -r matrix-crypto-ios/build/MatrixCryptoBridge.xcframework artifacts/ios/ || true
     - ls -lah artifacts/
   
   artifacts:
@@ -213,7 +213,7 @@ release:artifacts:
           url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-android/build/outputs/aar/matrix-crypto-android-release.aar"
           link_type: other
         - name: "iOS XCFramework"
-          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/fortress-crypto-ios/build/MatrixCryptoBridge.xcframework"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-ios/build/MatrixCryptoBridge.xcframework"
           link_type: other
   
   only:
@@ -248,7 +248,7 @@ If you haven't already, push your code to GitLab:
 
 ```bash
 # Add GitLab remote
-git remote add gitlab https://gitlab.com/your-username/fortress-crypto-bridge.git
+git remote add gitlab https://gitlab.com/your-username/matrix-crypto-bridge.git
 
 # Push to GitLab
 git push gitlab master
@@ -341,8 +341,8 @@ To manually trigger:
 | Android AAR (Release) | `matrix-crypto-android/build/outputs/aar/matrix-crypto-android-release.aar` | 30 days |
 | Android AAR (Debug) | `matrix-crypto-android/build/outputs/aar/matrix-crypto-android-debug.aar` | 30 days |
 | Kotlin Bindings | `matrix-crypto-android/generated/` | 30 days |
-| iOS XCFramework | `fortress-crypto-ios/build/MatrixCryptoBridge.xcframework/` | 30 days |
-| Swift Bindings | `fortress-crypto-ios/generated/` | 30 days |
+| iOS XCFramework | `matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/` | 30 days |
+| Swift Bindings | `matrix-crypto-ios/generated/` | 30 days |
 
 ### Downloading Artifacts
 
@@ -442,7 +442,7 @@ build:android:
 Add to your README.md:
 
 ```markdown
-[![pipeline status](https://gitlab.com/your-username/fortress-crypto-bridge/badges/master/pipeline.svg)](https://gitlab.com/your-username/fortress-crypto-bridge/-/commits/master)
+[![pipeline status](https://gitlab.com/your-username/matrix-crypto-bridge/badges/master/pipeline.svg)](https://gitlab.com/your-username/matrix-crypto-bridge/-/commits/master)
 ```
 
 ---

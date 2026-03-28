@@ -1,4 +1,4 @@
-# Cargo configuration for fortress-crypto-core
+# Cargo configuration for matrix-crypto-core
 # Optimized for cross-compilation to Android
 
 [build]
