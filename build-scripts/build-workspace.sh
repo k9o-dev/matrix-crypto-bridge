@@ -191,9 +191,9 @@ build_android() {
         print_subsection "Building for $target..."
         
         cd "$PROJECT_ROOT"
-        # Use cargo-ndk for proper Android NDK integration
-        print_info "Invoking: cargo-ndk -t $target -o $WORKSPACE_TARGET/$target/release build -p matrix-crypto-android --release"
-        if cargo-ndk -t "$target" -o "$WORKSPACE_TARGET/$target/release" build -p matrix-crypto-android --release; then
+        # Use cargo ndk as a cargo subcommand (must be invoked via cargo)
+        print_info "Invoking: cargo ndk -t $target build -p matrix-crypto-android --release"
+        if cargo ndk -t "$target" build -p matrix-crypto-android --release; then
             print_success "Build succeeded for $target"
             
             # Copy the shared library
