@@ -21,11 +21,12 @@ rand = "0.8"
 hex = "0.4"
 
 [lib]
-# Platform-specific crate types:
-# - Android (aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android): cdylib (dynamic library for JNI)
-# - iOS (aarch64-apple-ios, x86_64-apple-ios): staticlib (static library for linking)
-# UniFFI generates bindings for both types
-crate-type = ["cdylib", "staticlib"]
+# Use staticlib for all platforms
+# Note: Rust doesn't support cdylib for cross-compilation targets (Android, iOS)
+# Instead, we produce static libraries that are linked by the native build systems:
+# - Android: NDK's CMake/Gradle links the .a files and creates .so files via JNI
+# - iOS: Xcode links the .a files directly into the app binary
+crate-type = ["staticlib"]
 
 [build-dependencies]
 uniffi = { version = "0.27", features = ["build"] }

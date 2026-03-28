@@ -181,21 +181,24 @@ mkdir -p "$ANDROID_DIR/src/main/jniLibs/arm64-v8a"
 mkdir -p "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a"
 mkdir -p "$ANDROID_DIR/src/main/jniLibs/x86_64"
 
+# Create directory for static libraries
+mkdir -p "$ANDROID_DIR/src/main/jniLibs/static"
+
 echo "Copying aarch64 library..."
-if [ -f "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
-    cp "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" \
-       "$ANDROID_DIR/src/main/jniLibs/arm64-v8a/"
+if [ -f "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.a" ]; then
+    cp "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.a" \
+       "$ANDROID_DIR/src/main/jniLibs/static/libmatrix_crypto_core_arm64.a"
     echo -e "${GREEN}✓ Copied arm64-v8a library${NC}"
 else
     echo -e "${RED}✗ arm64-v8a library not found${NC}"
-    echo "Looking for: $WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so"
+    echo "Looking for: $WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.a"
     exit 1
 fi
 
 echo "Copying armv7 library..."
-if [ -f "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
-    cp "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
-       "$ANDROID_DIR/src/main/jniLibs/armeabi-v7a/"
+if [ -f "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.a" ]; then
+    cp "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.a" \
+       "$ANDROID_DIR/src/main/jniLibs/static/libmatrix_crypto_core_armv7.a"
     echo -e "${GREEN}✓ Copied armeabi-v7a library${NC}"
 else
     echo -e "${RED}✗ armeabi-v7a library not found${NC}"
@@ -203,9 +206,9 @@ else
 fi
 
 echo "Copying x86_64 library..."
-if [ -f "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
-    cp "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" \
-       "$ANDROID_DIR/src/main/jniLibs/x86_64/"
+if [ -f "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.a" ]; then
+    cp "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.a" \
+       "$ANDROID_DIR/src/main/jniLibs/static/libmatrix_crypto_core_x86_64.a"
     echo -e "${GREEN}✓ Copied x86_64 library${NC}"
 else
     echo -e "${RED}✗ x86_64 library not found${NC}"
@@ -219,8 +222,9 @@ echo ""
 echo -e "${BLUE}Build artifacts:${NC}"
 
 # Check and report built libraries
+echo -e "${BLUE}Static libraries:${NC}"
 for target in "${ANDROID_TARGETS[@]}"; do
-    lib_path="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_core.so"
+    lib_path="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_core.a"
     if [ -f "$lib_path" ]; then
         size=$(du -h "$lib_path" | cut -f1)
         echo "  - $target: $size"
