@@ -42,3 +42,10 @@ Thumbs.db
 # Generated files
 matrix-crypto-ios/generated/
 matrix-crypto-android/generated/
+
+# Generated libraries
+*.so
+*.a
+*.m
+*.rlib
+
