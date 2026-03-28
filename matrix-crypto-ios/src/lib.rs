@@ -1,7 +1,17 @@
 // Matrix Crypto Bridge - iOS Wrapper
 // Re-exports the core library for UniFFI and iOS static linking
 
-pub use matrix_crypto_core::{MatrixCrypto, CryptoError};
+// Re-export all types from core library so UniFFI can access them
+pub use matrix_crypto_core::{
+    MatrixCrypto,
+    CryptoError,
+    DeviceInfo,
+    EmojiSASPair,
+    VerificationState,
+    RoomEncryptionState,
+    UserDevices,
+    EncryptionAlgorithm,
+};
 
 // UniFFI scaffolding for iOS
 uniffi::include_scaffolding!("matrix_crypto");
