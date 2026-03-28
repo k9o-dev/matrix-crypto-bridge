@@ -13,6 +13,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 RUST_DIR="$PROJECT_ROOT/matrix-crypto-core"
 PACKAGE_DIR="$PROJECT_ROOT/react-native-matrix-crypto"
+WORKSPACE_TARGET="$PROJECT_ROOT/target"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Matrix Crypto Bridge - Build & Package Script            ║${NC}"
@@ -125,8 +126,8 @@ if [ "$BUILD_IOS" = true ] || [ "$BUILD_ALL" = true ]; then
     mkdir -p "$PACKAGE_DIR/ios/prebuilt"
     
     echo "Copying aarch64 (device) library..."
-    if [ -f "$RUST_DIR/target/aarch64-apple-ios/release/libmatrix_crypto_core.a" ]; then
-        cp "$RUST_DIR/target/aarch64-apple-ios/release/libmatrix_crypto_core.a" \
+    if [ -f "$WORKSPACE_TARGET/aarch64-apple-ios/release/libmatrix_crypto_core.a" ]; then
+        cp "$WORKSPACE_TARGET/aarch64-apple-ios/release/libmatrix_crypto_core.a" \
            "$PACKAGE_DIR/ios/prebuilt/libmatrix_crypto_core_arm64.a"
         print_success "Copied arm64 library"
     else
@@ -135,8 +136,8 @@ if [ "$BUILD_IOS" = true ] || [ "$BUILD_ALL" = true ]; then
     fi
     
     echo "Copying x86_64 (simulator) library..."
-    if [ -f "$RUST_DIR/target/x86_64-apple-ios/release/libmatrix_crypto_core.a" ]; then
-        cp "$RUST_DIR/target/x86_64-apple-ios/release/libmatrix_crypto_core.a" \
+    if [ -f "$WORKSPACE_TARGET/x86_64-apple-ios/release/libmatrix_crypto_core.a" ]; then
+        cp "$WORKSPACE_TARGET/x86_64-apple-ios/release/libmatrix_crypto_core.a" \
            "$PACKAGE_DIR/ios/prebuilt/libmatrix_crypto_core_sim.a"
         print_success "Copied simulator library"
     else
@@ -178,8 +179,8 @@ if [ "$BUILD_ANDROID" = true ] || [ "$BUILD_ALL" = true ]; then
     mkdir -p "$PACKAGE_DIR/android/src/main/jniLibs/x86_64"
     
     echo "Copying aarch64 library..."
-    if [ -f "$PROJECT_ROOT/target/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
-        cp "$PROJECT_ROOT/target/aarch64-linux-android/release/libmatrix_crypto_core.so" \
+    if [ -f "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
+        cp "$WORKSPACE_TARGET/aarch64-linux-android/release/libmatrix_crypto_core.so" \
            "$PACKAGE_DIR/android/src/main/jniLibs/arm64-v8a/"
         print_success "Copied arm64-v8a library"
     else
@@ -188,8 +189,8 @@ if [ "$BUILD_ANDROID" = true ] || [ "$BUILD_ALL" = true ]; then
     fi
     
     echo "Copying armv7 library..."
-    if [ -f "$PROJECT_ROOT/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
-        cp "$PROJECT_ROOT/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
+    if [ -f "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
+        cp "$WORKSPACE_TARGET/armv7-linux-androideabi/release/libmatrix_crypto_core.so" \
            "$PACKAGE_DIR/android/src/main/jniLibs/armeabi-v7a/"
         print_success "Copied armeabi-v7a library"
     else
@@ -198,8 +199,8 @@ if [ "$BUILD_ANDROID" = true ] || [ "$BUILD_ALL" = true ]; then
     fi
     
     echo "Copying x86_64 library..."
-    if [ -f "$PROJECT_ROOT/target/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
-        cp "$PROJECT_ROOT/target/x86_64-linux-android/release/libmatrix_crypto_core.so" \
+    if [ -f "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
+        cp "$WORKSPACE_TARGET/x86_64-linux-android/release/libmatrix_crypto_core.so" \
            "$PACKAGE_DIR/android/src/main/jniLibs/x86_64/"
         print_success "Copied x86_64 library"
     else
