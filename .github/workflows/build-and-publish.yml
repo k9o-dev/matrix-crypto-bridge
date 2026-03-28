@@ -1,0 +1,225 @@
+name: Build and Publish to NPM
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to NPM"
+        required: false
+        default: "false"
+
+jobs:
+  build-ios:
+    name: Build iOS Libraries
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [aarch64-apple-ios, x86_64-apple-ios]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: matrix-crypto-core
+
+      - name: Build iOS library
+        working-directory: matrix-crypto-core
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-libs
+          path: matrix-crypto-core/target/${{ matrix.target }}/release/libmatrix_crypto_core.a
+          retention-days: 1
+
+  build-android:
+    name: Build Android Libraries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+          add-to-path: true
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: matrix-crypto-core
+
+      - name: Build Android libraries
+        working-directory: matrix-crypto-core
+        run: |
+          export ANDROID_NDK_HOME=$ANDROID_NDK_ROOT
+          cargo build --release --target aarch64-linux-android
+          cargo build --release --target armv7-linux-androideabi
+          cargo build --release --target x86_64-linux-android
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-libs
+          path: matrix-crypto-core/target/*/release/libmatrix_crypto_core.so
+          retention-days: 1
+
+  package:
+    name: Package for NPM
+    needs: [build-ios, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: ios-libs
+          path: ios-artifacts
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: android-libs
+          path: android-artifacts
+
+      - name: Organize iOS libraries
+        run: |
+          mkdir -p react-native-matrix-crypto/ios/prebuilt
+          cp ios-artifacts/aarch64-apple-ios/release/libmatrix_crypto_core.a \
+             react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_arm64.a
+          cp ios-artifacts/x86_64-apple-ios/release/libmatrix_crypto_core.a \
+             react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_sim.a
+
+      - name: Organize Android libraries
+        run: |
+          mkdir -p react-native-matrix-crypto/android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}
+          cp android-artifacts/aarch64-linux-android/release/libmatrix_crypto_core.so \
+             react-native-matrix-crypto/android/src/main/jniLibs/arm64-v8a/
+          cp android-artifacts/armv7-linux-androideabi/release/libmatrix_crypto_core.so \
+             react-native-matrix-crypto/android/src/main/jniLibs/armeabi-v7a/
+          cp android-artifacts/x86_64-linux-android/release/libmatrix_crypto_core.so \
+             react-native-matrix-crypto/android/src/main/jniLibs/x86_64/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        working-directory: react-native-matrix-crypto
+        run: npm install
+
+      - name: Build TypeScript
+        working-directory: react-native-matrix-crypto
+        run: npm run build
+
+      - name: Verify package contents
+        working-directory: react-native-matrix-crypto
+        run: |
+          echo "=== iOS Libraries ==="
+          ls -lh ios/prebuilt/
+          echo ""
+          echo "=== Android Libraries ==="
+          find android/src/main/jniLibs -name "*.so" -exec ls -lh {} \;
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-package
+          path: react-native-matrix-crypto
+          retention-days: 7
+
+  publish:
+    name: Publish to NPM
+    needs: package
+    runs-on: ubuntu-latest
+    environment: production
+    if: startsWith(github.ref, 'refs/tags/v' ) || github.event.inputs.publish == 'true'
+    steps:
+      - name: Download packaged artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: npm-package
+          path: react-native-matrix-crypto
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish to NPM
+        working-directory: react-native-matrix-crypto
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v' )
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            ## NPM Package
+            Published to [@k9o/react-native-matrix-crypto](https://www.npmjs.com/package/@k9o/react-native-matrix-crypto )
+
+            ## Build Information
+            - iOS: aarch64-apple-ios, x86_64-apple-ios
+            - Android: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android
+
+            ## Installation
+            ```bash
+            npm install @k9o/react-native-matrix-crypto
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify on Completion
+    needs: [build-ios, build-android, package]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build-ios.result }}" == "failure" ] || \
+             [ "${{ needs.build-android.result }}" == "failure" ] || \
+             [ "${{ needs.package.result }}" == "failure" ]; then
+            echo "Build failed!"
+            exit 1
+          fi
+          echo "Build succeeded!"
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Build and packaging completed successfully!'
+            })
