@@ -159,15 +159,20 @@ build_android() {
         fi
     fi
     
-    # Verify NDK installation
+    # Verify NDK installation and resolve symlinks
     if [ ! -d "$ANDROID_NDK_HOME" ]; then
         print_error "ANDROID_NDK_HOME points to non-existent directory: $ANDROID_NDK_HOME"
         return 1
     fi
     
-    print_info "Using NDK: $ANDROID_NDK_HOME"
+    # Resolve symlinks to get the real NDK path
+    export ANDROID_NDK_HOME="$(cd "$ANDROID_NDK_HOME" && pwd -P)"
+    print_info "Using NDK (resolved): $ANDROID_NDK_HOME"
+    
     if [ -f "$ANDROID_NDK_HOME/source.properties" ]; then
         print_info "NDK version: $(grep 'Pkg.Revision' $ANDROID_NDK_HOME/source.properties)"
+    else
+        print_warning "source.properties not found at $ANDROID_NDK_HOME/source.properties"
     fi
     
     # Verify and install Rust targets
