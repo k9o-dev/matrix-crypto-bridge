@@ -21,10 +21,11 @@ rand = "0.8"
 hex = "0.4"
 
 [lib]
-# Use staticlib for Android and other cross-compilation targets
-# cdylib is not supported for cross-compilation (e.g., aarch64-linux-android)
-# UniFFI handles the FFI bindings, so we only need the static library
-crate-type = ["staticlib"]
+# Platform-specific crate types:
+# - Android (aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android): cdylib (dynamic library for JNI)
+# - iOS (aarch64-apple-ios, x86_64-apple-ios): staticlib (static library for linking)
+# UniFFI generates bindings for both types
+crate-type = ["cdylib", "staticlib"]
 
 [build-dependencies]
 uniffi = { version = "0.27", features = ["build"] }
