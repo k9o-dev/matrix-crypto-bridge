@@ -98,6 +98,7 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         run: |
           echo "Building Android libraries..."
+          unset ANDROID_NDK_ROOT  # Ensure it's unset
           ./build-scripts/build-workspace.sh android
         continue-on-error: false
 
