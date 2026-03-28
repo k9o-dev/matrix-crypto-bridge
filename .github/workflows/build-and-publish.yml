@@ -40,11 +40,12 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Upload iOS artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ios-libs
+          name: ios-libs-${{ matrix.target }}
           path: matrix-crypto-core/target/${{ matrix.target }}/release/libmatrix_crypto_core.a
           retention-days: 1
+          if-no-files-found: error
 
   build-android:
     name: Build Android Libraries
@@ -78,11 +79,12 @@ jobs:
           cargo build --release --target x86_64-linux-android
 
       - name: Upload Android artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android-libs
           path: matrix-crypto-core/target/*/release/libmatrix_crypto_core.so
           retention-days: 1
+          if-no-files-found: error
 
   package:
     name: Package for NPM
@@ -92,14 +94,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download iOS artifacts
-        uses: actions/download-artifact@v3
+      - name: Download iOS artifacts (aarch64)
+        uses: actions/download-artifact@v4
         with:
-          name: ios-libs
-          path: ios-artifacts
+          name: ios-libs-aarch64-apple-ios
+          path: ios-artifacts/aarch64-apple-ios
+
+      - name: Download iOS artifacts (x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-libs-x86_64-apple-ios
+          path: ios-artifacts/x86_64-apple-ios
 
       - name: Download Android artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: android-libs
           path: android-artifacts
@@ -107,23 +115,47 @@ jobs:
       - name: Organize iOS libraries
         run: |
           mkdir -p react-native-matrix-crypto/ios/prebuilt
-          cp ios-artifacts/aarch64-apple-ios/release/libmatrix_crypto_core.a \
-             react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_arm64.a
-          cp ios-artifacts/x86_64-apple-ios/release/libmatrix_crypto_core.a \
-             react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_sim.a
+
+          # Copy aarch64 library
+          if [ -f "ios-artifacts/aarch64-apple-ios/libmatrix_crypto_core.a" ]; then
+            cp ios-artifacts/aarch64-apple-ios/libmatrix_crypto_core.a \
+               react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_arm64.a
+          fi
+
+          # Copy x86_64 library
+          if [ -f "ios-artifacts/x86_64-apple-ios/libmatrix_crypto_core.a" ]; then
+            cp ios-artifacts/x86_64-apple-ios/libmatrix_crypto_core.a \
+               react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_sim.a
+          fi
+
+          echo "=== iOS Libraries ===" && ls -lh react-native-matrix-crypto/ios/prebuilt/
 
       - name: Organize Android libraries
         run: |
           mkdir -p react-native-matrix-crypto/android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}
-          cp android-artifacts/aarch64-linux-android/release/libmatrix_crypto_core.so \
-             react-native-matrix-crypto/android/src/main/jniLibs/arm64-v8a/
-          cp android-artifacts/armv7-linux-androideabi/release/libmatrix_crypto_core.so \
-             react-native-matrix-crypto/android/src/main/jniLibs/armeabi-v7a/
-          cp android-artifacts/x86_64-linux-android/release/libmatrix_crypto_core.so \
-             react-native-matrix-crypto/android/src/main/jniLibs/x86_64/
+
+          # Copy aarch64 library
+          if [ -f "android-artifacts/aarch64-linux-android/release/libmatrix_crypto_core.so" ]; then
+            cp android-artifacts/aarch64-linux-android/release/libmatrix_crypto_core.so \
+               react-native-matrix-crypto/android/src/main/jniLibs/arm64-v8a/
+          fi
+
+          # Copy armv7 library
+          if [ -f "android-artifacts/armv7-linux-androideabi/release/libmatrix_crypto_core.so" ]; then
+            cp android-artifacts/armv7-linux-androideabi/release/libmatrix_crypto_core.so \
+               react-native-matrix-crypto/android/src/main/jniLibs/armeabi-v7a/
+          fi
+
+          # Copy x86_64 library
+          if [ -f "android-artifacts/x86_64-linux-android/release/libmatrix_crypto_core.so" ]; then
+            cp android-artifacts/x86_64-linux-android/release/libmatrix_crypto_core.so \
+               react-native-matrix-crypto/android/src/main/jniLibs/x86_64/
+          fi
+
+          echo "=== Android Libraries ===" && find react-native-matrix-crypto/android/src/main/jniLibs -name "*.so" -exec ls -lh {} \;
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
@@ -139,18 +171,17 @@ jobs:
       - name: Verify package contents
         working-directory: react-native-matrix-crypto
         run: |
-          echo "=== iOS Libraries ==="
-          ls -lh ios/prebuilt/
+          echo "=== iOS Libraries ===" && ls -lh ios/prebuilt/ || echo "No iOS libraries found"
           echo ""
-          echo "=== Android Libraries ==="
-          find android/src/main/jniLibs -name "*.so" -exec ls -lh {} \;
+          echo "=== Android Libraries ===" && find android/src/main/jniLibs -name "*.so" -exec ls -lh {} \; || echo "No Android libraries found"
 
       - name: Upload packaged artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: npm-package
           path: react-native-matrix-crypto
           retention-days: 7
+          if-no-files-found: error
 
   publish:
     name: Publish to NPM
@@ -160,13 +191,13 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v' ) || github.event.inputs.publish == 'true'
     steps:
       - name: Download packaged artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: npm-package
           path: react-native-matrix-crypto
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
@@ -207,14 +238,14 @@ jobs:
           if [ "${{ needs.build-ios.result }}" == "failure" ] || \
              [ "${{ needs.build-android.result }}" == "failure" ] || \
              [ "${{ needs.package.result }}" == "failure" ]; then
-            echo "Build failed!"
+            echo "❌ Build failed!"
             exit 1
           fi
-          echo "Build succeeded!"
+          echo "✅ Build succeeded!"
 
       - name: Comment on PR (if applicable)
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request' && success()
+        uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({
