@@ -187,6 +187,16 @@ build_android() {
         cargo install cargo-ndk
     fi
     
+    # Verify cargo-ndk is actually available
+    print_subsection "Verifying cargo-ndk installation..."
+    if cargo ndk --version 2>/dev/null; then
+        print_success "cargo-ndk is available"
+    else
+        print_error "cargo-ndk is not available via 'cargo ndk'"
+        print_info "Attempting to install cargo-ndk..."
+        cargo install cargo-ndk --force
+    fi
+    
     for target in "${android_targets[@]}"; do
         print_subsection "Building for $target..."
         
@@ -198,6 +208,7 @@ build_android() {
         
         # Use cargo-ndk to build Android libraries with proper cdylib support
         print_info "Invoking: cargo ndk -t $target build -p matrix-crypto-android --release"
+        print_info "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
         if cargo ndk -t "$target" build -p matrix-crypto-android --release; then
             print_success "Build succeeded for $target"
             
