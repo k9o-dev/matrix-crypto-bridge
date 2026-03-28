@@ -1,9 +1,8 @@
-# Cargo configuration for matrix-crypto-core
-# Optimized for cross-compilation to Android
+# Cargo configuration for matrix-crypto-bridge
+# Platform-specific configurations for Android and iOS
 
-[build]
-# Use LLD linker for better compatibility
-rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+# IMPORTANT: Do NOT add global [build] rustflags - they break iOS builds
+# Each target has its own configuration below
 
 [target.aarch64-linux-android]
 # ARM64 Android configuration
@@ -44,3 +43,7 @@ rustflags = [
     "-C", "target-feature=+crt-static",
     "-C", "relocation-model=pic",
 ]
+
+# iOS targets use default Apple toolchain - no custom configuration needed
+# [target.aarch64-apple-ios] - uses default Apple linker
+# [target.x86_64-apple-ios] - uses default Apple linker
