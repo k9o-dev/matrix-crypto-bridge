@@ -1,7 +1,6 @@
 fn main() {
-    // Generate UniFFI scaffolding for Android
-    uniffi::generate_scaffolding("../matrix-crypto-core/src/matrix_crypto.udl")
-        .expect("Failed to generate UniFFI scaffolding");
-    
+    // NOTE: Do NOT call uniffi::generate_scaffolding() here.
+    // matrix-crypto-core already generates the UniFFI scaffolding.
+    // Calling it again here causes duplicate symbol errors at link time.
     println!("cargo:rustc-cfg=android_target");
 }
