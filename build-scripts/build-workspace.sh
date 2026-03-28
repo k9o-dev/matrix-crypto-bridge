@@ -175,7 +175,7 @@ build_android() {
         
         cd "$PROJECT_ROOT"
         # Use cargo-ndk for proper Android NDK integration
-        if cargo ndk -t "$target" build -p matrix-crypto-android --release; then
+        if cargo ndk --target "$target" build -p matrix-crypto-android --release; then
             print_success "Build succeeded for $target"
             
             # Copy the shared library
