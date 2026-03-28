@@ -7,26 +7,19 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-matrix-sdk-crypto = "0.7"
-# Tokio is not needed - all APIs are synchronous
-# Removed: tokio = { version = "1", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "1"
-uniffi = { version = "0.27", features = ["cli"] }
-tracing = "0.1"
-uuid = { version = "1", features = ["v4", "serde"] }
-base64 = "0.22"
-rand = "0.8"
-hex = "0.4"
+matrix-sdk-crypto = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uniffi = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+base64 = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
 
-[lib]
-# Use staticlib as the primary crate type
-# Note: Rust doesn't support cdylib for cross-compilation targets (Android, iOS)
-# Instead, we produce static libraries that are linked by the native build systems:
-# - Android: Static libraries (.a) that Android NDK links and wraps in .so for JNI
-# - iOS: Static libraries (.a) that Xcode links directly into the app binary
-crate-type = ["staticlib"]
+# No crate-type specified - this is a regular library
+# It will be used as a dependency by the Android and iOS wrapper crates
 
 [build-dependencies]
-uniffi = { version = "0.27", features = ["build"] }
+uniffi = { workspace = true, features = ["build"] }

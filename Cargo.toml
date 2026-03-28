@@ -1,10 +1,26 @@
 [workspace]
-members = ["matrix-crypto-core"]
+members = [
+    "matrix-crypto-core",
+    "matrix-crypto-android",
+    "matrix-crypto-ios",
+]
 resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Matrix Chat Contributors"]
+authors = ["k9o-dev"]
 license = "Apache-2.0"
-repository = "https://github.com/techscorpion-dev/matrix-crypto-bridge"
+repository = "https://github.com/k9o-dev/matrix-crypto-bridge"
+
+[workspace.dependencies]
+matrix-sdk-crypto = "0.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+uniffi = { version = "0.27", features = ["cli"] }
+tracing = "0.1"
+uuid = { version = "1", features = ["v4", "serde"] }
+base64 = "0.22"
+rand = "0.8"
+hex = "0.4"
