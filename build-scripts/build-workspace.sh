@@ -206,14 +206,14 @@ build_android() {
         if cargo build -p matrix-crypto-android --target "$target" --release; then
             print_success "Build succeeded for $target"
             
-            # Copy the shared library
-            local lib_file="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_android.so"
-            if verify_artifact "$lib_file" "Android shared library ($target)"; then
+            # Copy the static library
+            local lib_file="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_android.a"
+            if verify_artifact "$lib_file" "Android static library ($target)"; then
                 # Create ABI-specific directory
                 local abi_dir="$android_output_dir/lib/$target"
                 mkdir -p "$abi_dir"
-                cp "$lib_file" "$abi_dir/libmatrix_crypto_android.so"
-                print_success "Copied to $abi_dir/libmatrix_crypto_android.so"
+                cp "$lib_file" "$abi_dir/libmatrix_crypto_android.a"
+                print_success "Copied to $abi_dir/libmatrix_crypto_android.a"
             else
                 print_error "Failed to find library for $target"
                 return 1
