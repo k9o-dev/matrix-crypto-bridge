@@ -170,6 +170,17 @@ build_android() {
         print_info "NDK version: $(grep 'Pkg.Revision' $ANDROID_NDK_HOME/source.properties)"
     fi
     
+    # Verify and install Rust targets
+    print_subsection "Verifying Rust targets..."
+    for target in "${android_targets[@]}"; do
+        if ! rustup target list | grep -q "^$target (installed)"; then
+            print_warning "Target $target not installed, installing..."
+            rustup target install "$target"
+        else
+            print_success "Target $target is installed"
+        fi
+    done
+    
     for target in "${android_targets[@]}"; do
         print_subsection "Building for $target..."
         
