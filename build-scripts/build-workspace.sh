@@ -192,13 +192,18 @@ build_android() {
         
         cd "$PROJECT_ROOT"
         
-        # Set up NDK environment variables for cargo-ndk
+        # Set up NDK environment variables
         export ANDROID_NDK_HOME="$ANDROID_NDK_HOME"
         export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
         
-        # Use cargo ndk as a cargo subcommand (must be invoked via cargo)
-        print_info "Invoking: cargo ndk -t $target build -p matrix-crypto-android --release"
-        if cargo ndk -t "$target" build -p matrix-crypto-android --release; then
+        # Set compiler variables for cargo
+        export CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+        export AR="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+        export RANLIB="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+        
+        # Use cargo build with target (cargo-ndk not needed with proper env vars)
+        print_info "Invoking: cargo build -p matrix-crypto-android --target $target --release"
+        if cargo build -p matrix-crypto-android --target "$target" --release; then
             print_success "Build succeeded for $target"
             
             # Copy the shared library
