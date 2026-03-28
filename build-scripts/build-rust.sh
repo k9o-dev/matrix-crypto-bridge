@@ -46,10 +46,10 @@ if [ "$1" == "ios" ]; then
     TARGETS=("aarch64-apple-ios" "x86_64-apple-ios")
 elif [ "$1" == "android" ]; then
     BUILD_ANDROID=true
-    TARGETS=("aarch64-linux-android" "armv7-linux-android" "x86_64-linux-android")
+    TARGETS=("aarch64-linux-android" "armv7-linux-androideabi" "x86_64-linux-android")
 elif [ "$1" == "all" ] || [ -z "$1" ]; then
     BUILD_ALL=true
-    TARGETS=("aarch64-apple-ios" "x86_64-apple-ios" "aarch64-linux-android" "armv7-linux-android" "x86_64-linux-android")
+    TARGETS=("aarch64-apple-ios" "x86_64-apple-ios" "aarch64-linux-android" "armv7-linux-androideabi" "x86_64-linux-android")
 else
     echo -e "${RED}Usage: $0 [ios|android|all]${NC}"
     exit 1
