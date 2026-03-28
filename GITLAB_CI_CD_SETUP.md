@@ -1,41 +1,53 @@
-# GitLab CI/CD Pipeline Setup for Android AAR and iOS XCFramework
+# GitLab CI/CD Pipeline Setup for NPM Publishing
 
-This guide provides step-by-step instructions for setting up automated CI/CD pipelines using GitLab CI to build the Android AAR and iOS XCFramework.
+This guide provides step-by-step instructions for setting up automated CI/CD pipelines using GitLab CI to build native libraries and publish the `@k9o/react-native-matrix-crypto` package to NPM.
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [GitLab CI/CD Configuration](#gitlab-cicd-configuration)
 3. [Setup Instructions](#setup-instructions)
-4. [Build Artifacts](#build-artifacts)
-5. [Advanced Configuration](#advanced-configuration)
-6. [Troubleshooting](#troubleshooting)
+4. [Build Process](#build-process)
+5. [Publishing to NPM](#publishing-to-npm)
+6. [Advanced Configuration](#advanced-configuration)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-The GitLab CI/CD pipeline automates the following steps:
+The GitLab CI/CD pipeline automates the complete build and publish process:
 
-1. **Checkout code** from the repository
-2. **Setup Rust** with Android/iOS targets
-3. **Setup Android NDK** and SDK (for Android builds)
-4. **Setup Xcode** (for iOS builds)
-5. **Build Rust libraries** for all targets
-6. **Generate language bindings** (Kotlin, Swift)
-7. **Build Android AAR** using Gradle
-8. **Build iOS XCFramework**
-9. **Store artifacts** for download and release
+1. **Build iOS Libraries** (macOS runner)
+   - Compile for aarch64-apple-ios (device)
+   - Compile for x86_64-apple-ios (simulator)
+
+2. **Build Android Libraries** (Ubuntu runner)
+   - Compile for aarch64-linux-android (ARM64)
+   - Compile for armv7-linux-androideabi (ARMv7)
+   - Compile for x86_64-linux-android (x86_64)
+
+3. **Package for NPM** (Ubuntu runner)
+   - Download all build artifacts
+   - Organize iOS libraries in `ios/prebuilt/`
+   - Organize Android libraries in `android/src/main/jniLibs/`
+   - Build TypeScript
+   - Verify package contents
+
+4. **Publish to NPM** (Ubuntu runner)
+   - Publish to NPM registry
+   - Create GitLab Release with build information
 
 ### Benefits
 
-- ✅ Automated builds on every commit/tag/MR
-- ✅ Parallel builds for Android and iOS
+- ✅ Fully automated builds on version tags
+- ✅ Pre-built native libraries included in NPM package
+- ✅ Auto-linking via CocoaPods (iOS) and Gradle (Android)
+- ✅ Parallel builds for iOS and Android
 - ✅ Consistent build environment
+- ✅ Multi-platform support (iOS device, iOS simulator, Android ARM64/ARMv7/x86_64)
 - ✅ Built-in artifact storage
 - ✅ Pipeline status notifications
-- ✅ Scheduled builds support
-- ✅ Manual trigger capability
 
 ---
 
@@ -45,16 +57,57 @@ The GitLab CI/CD pipeline automates the following steps:
 
 ```yaml
 # Matrix Crypto Bridge - GitLab CI/CD Pipeline
-# Builds Android AAR and iOS XCFramework
+# Builds native libraries and publishes to NPM
 
 stages:
   - build
   - package
-  - release
+  - publish
+  - notify
 
 variables:
   RUST_BACKTRACE: "1"
   CARGO_TERM_COLOR: "always"
+
+# iOS Build Job
+build:ios:
+  stage: build
+  image: macos-12
+  
+  variables:
+    RUST_BACKTRACE: "1"
+  
+  before_script:
+    # Install Rust
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    - source $HOME/.cargo/env
+    - rustup target add aarch64-apple-ios x86_64-apple-ios
+  
+  script:
+    - echo "Building iOS libraries..."
+    - chmod +x ./build-scripts/build-ios.sh
+    - ./build-scripts/build-ios.sh
+  
+  artifacts:
+    paths:
+      - matrix-crypto-core/target/aarch64-apple-ios/release/libmatrix_crypto_core.a
+      - matrix-crypto-core/target/x86_64-apple-ios/release/libmatrix_crypto_core.a
+    expire_in: 1 day
+    when: always
+  
+  cache:
+    paths:
+      - .cargo/
+      - target/
+  
+  only:
+    - branches
+    - tags
+    - merge_requests
+  
+  tags:
+    - macos
+    - xcode
 
 # Android Build Job
 build:android:
@@ -62,7 +115,7 @@ build:android:
   image: ubuntu:22.04
   
   variables:
-    ANDROID_NDK_VERSION: "27.1.12297006"
+    ANDROID_NDK_VERSION: "r25c"
     JAVA_HOME: "/usr/lib/jvm/java-17-temurin"
   
   before_script:
@@ -82,35 +135,24 @@ build:android:
     - apt-get install -y -qq android-sdk
     - export ANDROID_SDK_ROOT=/usr/lib/android-sdk
     - export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION
-    
-    # Install uniffi-bindgen
-    - cargo install uniffi --features=cli
   
   script:
-    # Build Rust for Android
-    - echo "Building Rust for Android..."
+    - echo "Building Android libraries..."
     - chmod +x ./build-scripts/build-android.sh
     - ./build-scripts/build-android.sh
-    
-    # Build Android AAR
-    - echo "Building Android AAR..."
-    - cd matrix-crypto-android
-    - chmod +x ./gradlew
-    - ./gradlew build
-    - cd ..
   
   artifacts:
     paths:
-      - matrix-crypto-android/build/outputs/aar/
-      - matrix-crypto-android/generated/
-    expire_in: 30 days
+      - matrix-crypto-core/target/aarch64-linux-android/release/libmatrix_crypto_core.so
+      - matrix-crypto-core/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so
+      - matrix-crypto-core/target/x86_64-linux-android/release/libmatrix_crypto_core.so
+    expire_in: 1 day
     when: always
   
   cache:
     paths:
       - .cargo/
       - target/
-      - matrix-crypto-android/.gradle/
   
   only:
     - branches
@@ -121,84 +163,96 @@ build:android:
     - linux
     - docker
 
-# iOS Build Job
-build:ios:
-  stage: build
-  image: macos-12
-  
-  variables:
-    RUST_BACKTRACE: "1"
-  
-  before_script:
-    # Install Rust
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-    - source $HOME/.cargo/env
-    - rustup target add aarch64-apple-ios x86_64-apple-ios
-    
-    # Install uniffi-bindgen
-    - cargo install uniffi --features=cli
-  
-  script:
-    # Build Rust for iOS
-    - echo "Building Rust for iOS..."
-    - chmod +x ./build-scripts/build-ios.sh
-    - ./build-scripts/build-ios.sh
-  
-  artifacts:
-    paths:
-      - matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/
-      - matrix-crypto-ios/generated/
-    expire_in: 30 days
-    when: always
-  
-  cache:
-    paths:
-      - .cargo/
-      - target/
-  
-  only:
-    - branches
-    - tags
-    - merge_requests
-  
-  tags:
-    - macos
-    - xcode
-
 # Package Job - Combine artifacts
-package:artifacts:
+package:npm:
   stage: package
   image: ubuntu:22.04
   
   dependencies:
-    - build:android
     - build:ios
+    - build:android
+  
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq curl
+    - curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    - apt-get install -y -qq nodejs
   
   script:
-    - echo "Packaging build artifacts..."
-    - mkdir -p artifacts/android artifacts/ios
-    - cp -r matrix-crypto-android/build/outputs/aar/* artifacts/android/ || true
-    - cp -r matrix-crypto-ios/build/MatrixCryptoBridge.xcframework artifacts/ios/ || true
-    - ls -lah artifacts/
+    - echo "Packaging for NPM..."
+    - mkdir -p react-native-matrix-crypto/ios/prebuilt
+    - mkdir -p react-native-matrix-crypto/android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86_64}
+    
+    # Copy iOS libraries
+    - cp matrix-crypto-core/target/aarch64-apple-ios/release/libmatrix_crypto_core.a react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_arm64.a
+    - cp matrix-crypto-core/target/x86_64-apple-ios/release/libmatrix_crypto_core.a react-native-matrix-crypto/ios/prebuilt/libmatrix_crypto_core_sim.a
+    
+    # Copy Android libraries
+    - cp matrix-crypto-core/target/aarch64-linux-android/release/libmatrix_crypto_core.so react-native-matrix-crypto/android/src/main/jniLibs/arm64-v8a/
+    - cp matrix-crypto-core/target/armv7-linux-androideabi/release/libmatrix_crypto_core.so react-native-matrix-crypto/android/src/main/jniLibs/armeabi-v7a/
+    - cp matrix-crypto-core/target/x86_64-linux-android/release/libmatrix_crypto_core.so react-native-matrix-crypto/android/src/main/jniLibs/x86_64/
+    
+    # Build TypeScript
+    - cd react-native-matrix-crypto
+    - npm install
+    - npm run build
+    - cd ..
+    
+    # Verify package contents
+    - echo "=== iOS Libraries ===" && ls -lh react-native-matrix-crypto/ios/prebuilt/
+    - echo "=== Android Libraries ===" && find react-native-matrix-crypto/android/src/main/jniLibs -name "*.so" -exec ls -lh {} \;
   
   artifacts:
     paths:
-      - artifacts/
-    expire_in: 90 days
+      - react-native-matrix-crypto/
+    expire_in: 7 days
+    when: always
   
   only:
     - tags
     - main
     - master
+    - develop
+  
+  tags:
+    - linux
+    - docker
+
+# Publish Job - Publish to NPM
+publish:npm:
+  stage: publish
+  image: ubuntu:22.04
+  
+  dependencies:
+    - package:npm
+  
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq curl
+    - curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    - apt-get install -y -qq nodejs
+    - cd react-native-matrix-crypto
+    - npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
+  
+  script:
+    - echo "Publishing to NPM..."
+    - npm publish --access public
+  
+  only:
+    - tags
+  
+  tags:
+    - linux
+    - docker
 
 # Release Job - Create GitLab release
 release:artifacts:
-  stage: release
+  stage: publish
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   
   dependencies:
-    - build:android
     - build:ios
+    - build:android
   
   script:
     - echo "Creating release..."
@@ -209,11 +263,8 @@ release:artifacts:
     description: "Build artifacts for $CI_COMMIT_TAG"
     assets:
       links:
-        - name: "Android AAR"
-          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-android/build/outputs/aar/matrix-crypto-android-release.aar"
-          link_type: other
-        - name: "iOS XCFramework"
-          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/raw/matrix-crypto-ios/build/MatrixCryptoBridge.xcframework"
+        - name: "NPM Package"
+          url: "https://www.npmjs.com/package/@k9o/react-native-matrix-crypto"
           link_type: other
   
   only:
@@ -223,16 +274,22 @@ release:artifacts:
     - linux
     - docker
 
-# Scheduled Build Job
-build:scheduled:
-  stage: build
+# Notify Job - Pipeline completion
+notify:completion:
+  stage: notify
   image: ubuntu:22.04
+  
   script:
-    - echo "Running scheduled build..."
-    - chmod +x ./build-scripts/build-android.sh
-    - ./build-scripts/build-android.sh
-  only:
-    - schedules
+    - echo "Pipeline completed!"
+    - |
+      if [ "$CI_JOB_STATUS" == "success" ]; then
+        echo "✅ Build and publish successful!"
+      else
+        echo "❌ Build or publish failed!"
+      fi
+  
+  when: always
+  
   tags:
     - linux
     - docker
@@ -257,21 +314,35 @@ git push gitlab master
 ### Step 2: Add `.gitlab-ci.yml` to Your Repository
 
 ```bash
-# Copy the configuration file
-cp .gitlab-ci.yml .gitlab-ci.yml
-
-# Or create it manually
+# Create the file
 cat > .gitlab-ci.yml << 'EOF'
 # [Paste the YAML content from above]
 EOF
 
 # Commit and push
 git add .gitlab-ci.yml
-git commit -m "Add: GitLab CI/CD pipeline configuration"
+git commit -m "Add: GitLab CI/CD pipeline configuration for NPM publishing"
 git push gitlab master
 ```
 
-### Step 3: Configure GitLab Runners
+### Step 3: Configure GitLab CI/CD Variables
+
+1. Go to your GitLab project
+2. Click **Settings → CI/CD → Variables**
+3. Click **Add variable**
+4. Add the following variables:
+
+| Variable | Value | Protected | Masked |
+|----------|-------|-----------|--------|
+| `NPM_TOKEN` | Your NPM authentication token | Yes | Yes |
+
+**To create NPM token:**
+```bash
+npm login
+npm token create --read-only
+```
+
+### Step 4: Configure GitLab Runners
 
 GitLab CI/CD requires runners to execute jobs. You have two options:
 
@@ -309,22 +380,42 @@ sudo gitlab-runner register \
   --tag-list macos,xcode
 ```
 
-### Step 4: Verify Pipeline Setup
+### Step 5: Verify Pipeline Setup
 
 1. Go to your GitLab project
 2. Click **CI/CD → Pipelines**
 3. You should see pipelines listed
 4. Click on a pipeline to view job details
 
-### Step 5: Trigger a Build
+### Step 6: Test Local Build
+
+Before publishing, test the build scripts locally:
+
+```bash
+# Build all platforms
+bash build-scripts/build-and-package.sh all
+
+# Verify package contents
+ls -la react-native-matrix-crypto/ios/prebuilt/
+ls -la react-native-matrix-crypto/android/src/main/jniLibs/
+```
+
+---
+
+## Build Process
+
+### Triggering Builds
 
 Builds are triggered automatically on:
-- **Push to any branch** — Runs all jobs
-- **Merge requests** — Runs all jobs
-- **Tags** — Runs all jobs + creates release
+
+- **Push to any branch** — Runs all build jobs
+- **Merge requests** — Runs all build jobs
+- **Tags** — Runs all jobs + publishes to NPM + creates release
 - **Scheduled** — Runs on schedule (if configured)
 
-To manually trigger:
+### Manual Trigger
+
+To manually trigger a build:
 
 1. Go to **CI/CD → Pipelines**
 2. Click **Run Pipeline**
@@ -332,41 +423,46 @@ To manually trigger:
 
 ---
 
-## Build Artifacts
+## Publishing to NPM
 
-### Artifact Locations
+### Automatic Publishing
 
-| Artifact | Location | Retention |
-|----------|----------|-----------|
-| Android AAR (Release) | `matrix-crypto-android/build/outputs/aar/matrix-crypto-android-release.aar` | 30 days |
-| Android AAR (Debug) | `matrix-crypto-android/build/outputs/aar/matrix-crypto-android-debug.aar` | 30 days |
-| Kotlin Bindings | `matrix-crypto-android/generated/` | 30 days |
-| iOS XCFramework | `matrix-crypto-ios/build/MatrixCryptoBridge.xcframework/` | 30 days |
-| Swift Bindings | `matrix-crypto-ios/generated/` | 30 days |
+When you push a git tag, the pipeline automatically:
 
-### Downloading Artifacts
-
-#### From Pipeline View
-
-1. Go to **CI/CD → Pipelines**
-2. Click on a pipeline
-3. Click the job (e.g., `build:android`)
-4. Click **Download artifacts** button
-
-#### From Job View
-
-1. Go to **CI/CD → Jobs**
-2. Click on a job
-3. Right panel shows **Artifacts** section
-4. Click artifact name to download
-
-#### Using GitLab API
+1. Builds iOS and Android libraries
+2. Packages for NPM
+3. Publishes to NPM
+4. Creates GitLab Release
 
 ```bash
-# Download Android AAR
-curl --output app.aar \
-  "https://gitlab.com/api/v4/projects/PROJECT_ID/jobs/JOB_ID/artifacts/matrix-crypto-android/build/outputs/aar/matrix-crypto-android-release.aar" \
-  --header "PRIVATE-TOKEN: YOUR_ACCESS_TOKEN"
+# 1. Update version
+npm version patch    # or minor/major
+
+# 2. Create git tag
+git tag -a v1.1.0 -m "Release v1.1.0"
+
+# 3. Push to GitLab
+git push gitlab main
+git push gitlab v1.1.0
+
+# GitLab CI/CD automatically publishes
+```
+
+### Manual Publishing
+
+If you need to publish manually:
+
+```bash
+cd react-native-matrix-crypto
+
+# Ensure everything is built
+npm run build
+
+# Verify package contents
+npm pack --dry-run
+
+# Publish to NPM
+npm publish --access public
 ```
 
 ---
@@ -383,8 +479,6 @@ To run builds on a schedule (e.g., daily):
 4. Select branch (e.g., `master`)
 5. Click **Save pipeline schedule**
 
-The `build:scheduled` job will run automatically.
-
 ### Conditional Builds
 
 Build only when specific files change:
@@ -394,7 +488,6 @@ build:android:
   only:
     changes:
       - matrix-crypto-core/**/*
-      - matrix-crypto-android/**/*
       - build-scripts/**/*
       - .gitlab-ci.yml
 ```
@@ -409,18 +502,6 @@ build:android:
 ```
 
 Then click **Play** button in the pipeline view.
-
-### Environment-Specific Variables
-
-Set different variables for different environments:
-
-```yaml
-build:android:
-  variables:
-    ANDROID_NDK_VERSION: "27.1.12297006"
-  environment:
-    name: production
-```
 
 ### Notifications
 
@@ -451,7 +532,7 @@ Add to your README.md:
 
 ### Issue: "No runners available"
 
-**Solution:** 
+**Solution:**
 - Ensure runners are registered and tagged correctly
 - Check runner tags match job tags
 - Go to **Settings → CI/CD → Runners** to verify
@@ -483,10 +564,13 @@ sudo gitlab-runner verify
 - Ensure `artifacts:` section is configured
 - Check artifact retention hasn't expired
 
-```bash
-# Verify artifacts exist
-ls -la matrix-crypto-android/build/outputs/aar/
-```
+### Issue: "NPM publish failed"
+
+**Solution:**
+1. Verify `NPM_TOKEN` is set correctly
+2. Check token has `write:packages` permission
+3. Verify package name is correct
+4. Check version number is unique
 
 ### Issue: "Runner timeout"
 
@@ -499,86 +583,61 @@ ls -la matrix-crypto-android/build/outputs/aar/
 - Optimize build process
 - Use caching to speed up builds
 
-### Issue: "Out of disk space"
-
-**Solution:**
-- Reduce artifact retention:
-  ```yaml
-  artifacts:
-    expire_in: 7 days  # Reduce from 30 days
-  ```
-- Clear old artifacts manually
-- Use self-hosted runner with more storage
-
 ---
 
-## Performance Optimization
+## Best Practices
 
-### Caching
+1. **Use semantic versioning:**
+   ```bash
+   npm version patch    # Bug fixes (1.0.0 → 1.0.1)
+   npm version minor    # New features (1.0.0 → 1.1.0)
+   npm version major    # Breaking changes (1.0.0 → 2.0.0)
+   ```
 
-Cache dependencies to speed up builds:
+2. **Test locally before publishing:**
+   ```bash
+   bash build-scripts/build-and-package.sh all
+   npm link
+   # Test in app
+   npm unlink
+   ```
 
-```yaml
-cache:
-  paths:
-    - .cargo/
-    - target/
-    - matrix-crypto-android/.gradle/
-  key:
-    files:
-      - Cargo.lock
-      - matrix-crypto-android/build.gradle
-```
+3. **Update changelog:**
+   - Document all changes
+   - Include breaking changes
+   - Link to related issues
 
-### Parallel Builds
+4. **Monitor build status:**
+   - Check CI/CD → Pipelines regularly
+   - Set up Slack notifications
+   - Review build logs for warnings
 
-Android and iOS builds run in parallel automatically:
-
-```yaml
-stages:
-  - build        # Both jobs run simultaneously
-  - package      # Waits for all build jobs
-  - release      # Final stage
-```
-
-### Incremental Builds
-
-Use Rust incremental compilation:
-
-```yaml
-variables:
-  CARGO_INCREMENTAL: "1"
-```
-
----
-
-## Comparison: GitHub Actions vs GitLab CI/CD
-
-| Feature | GitHub Actions | GitLab CI/CD |
-|---------|----------------|-------------|
-| **Setup** | Workflows in `.github/workflows/` | Single `.gitlab-ci.yml` file |
-| **Runners** | Shared runners included | Shared runners included |
-| **Parallelization** | Jobs run in parallel | Jobs run in parallel |
-| **Caching** | Per-workflow | Per-pipeline |
-| **Artifacts** | 30-90 days retention | Configurable retention |
-| **Releases** | Automatic release creation | Manual release creation |
-| **Notifications** | Built-in integrations | Slack, email, webhooks |
-| **Cost** | Free for public repos | Free for public repos |
-| **Complexity** | Multiple YAML files | Single YAML file |
+5. **Cache dependencies:**
+   ```yaml
+   cache:
+     paths:
+       - .cargo/
+       - target/
+   ```
 
 ---
 
 ## Next Steps
 
-1. **Add `.gitlab-ci.yml`** to your repository
-2. **Push to GitLab** and verify pipeline appears
-3. **Configure runners** (use shared runners or self-hosted)
-4. **Trigger a build** manually to test
-5. **Download artifacts** to verify they work
-6. **Set up notifications** for build status
-7. **Integrate into your React Native app**
+1. Add `.gitlab-ci.yml` to your repository
+2. Configure `NPM_TOKEN` in CI/CD variables
+3. Setup runners (shared or self-hosted)
+4. Test local build with `build-scripts/build-and-package.sh all`
+5. Create a test release with `npm version patch`
+6. Push git tag to trigger automated build
+7. Verify package on NPM registry
 
-For more information:
+---
+
+## Resources
+
 - [GitLab CI/CD Documentation](https://docs.gitlab.com/ee/ci/)
 - [GitLab Runner Documentation](https://docs.gitlab.com/runner/)
-- [GitLab CI/CD Variables](https://docs.gitlab.com/ee/ci/variables/)
+- [NPM Publishing Guide](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry)
+- [Semantic Versioning](https://semver.org/)
+- [React Native Native Modules](https://reactnative.dev/docs/native-modules-intro)

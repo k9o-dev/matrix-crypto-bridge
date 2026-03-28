@@ -1,406 +1,497 @@
-# CI/CD Pipeline Setup for Android AAR Building
+# CI/CD Pipeline Setup for NPM Publishing
 
-This guide provides step-by-step instructions for setting up automated CI/CD pipelines to build the Android AAR (Android Archive) file using GitHub Actions.
+This guide provides step-by-step instructions for setting up automated CI/CD pipelines to build native libraries and publish the `@k9o/react-native-matrix-crypto` package to NPM using GitHub Actions.
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [GitHub Actions Workflow](#github-actions-workflow)
 3. [Setup Instructions](#setup-instructions)
-4. [Build Artifacts](#build-artifacts)
-5. [Troubleshooting](#troubleshooting)
+4. [Build Process](#build-process)
+5. [Publishing to NPM](#publishing-to-npm)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-The CI/CD pipeline automates the following steps:
+The CI/CD pipeline automates the complete build and publish process:
 
-1. **Checkout code** from the repository
-2. **Setup Rust** with Android targets
-3. **Setup Android NDK** and SDK
-4. **Build Rust libraries** for all Android targets (aarch64, armv7, x86_64)
-5. **Generate Kotlin bindings** using UniFFI
-6. **Build Android AAR** using Gradle
-7. **Upload artifacts** for download
+1. **Build iOS Libraries** (macOS runner)
+   - Compile for aarch64-apple-ios (device)
+   - Compile for x86_64-apple-ios (simulator)
+   - Upload artifacts
+
+2. **Build Android Libraries** (Ubuntu runner)
+   - Compile for aarch64-linux-android (ARM64)
+   - Compile for armv7-linux-androideabi (ARMv7)
+   - Compile for x86_64-linux-android (x86_64)
+   - Upload artifacts
+
+3. **Package for NPM** (Ubuntu runner)
+   - Download all build artifacts
+   - Organize iOS libraries in `ios/prebuilt/`
+   - Organize Android libraries in `android/src/main/jniLibs/`
+   - Build TypeScript
+   - Verify package contents
+
+4. **Publish to NPM** (Ubuntu runner)
+   - Publish to NPM registry
+   - Create GitHub Release with build information
 
 ### Benefits
 
-- ✅ Automated builds on every commit/tag
-- ✅ Consistent build environment (no "works on my machine")
-- ✅ Multi-platform support (macOS, Linux, Windows)
-- ✅ Artifact storage for releases
-- ✅ Build status notifications
+- ✅ Fully automated builds on version tags
+- ✅ Pre-built native libraries included in NPM package
+- ✅ Auto-linking via CocoaPods (iOS) and Gradle (Android)
+- ✅ No manual build steps required for users
+- ✅ Consistent build environment across platforms
+- ✅ Multi-platform support (iOS device, iOS simulator, Android ARM64/ARMv7/x86_64)
+- ✅ Artifact storage and GitHub Releases
 
 ---
 
 ## GitHub Actions Workflow
 
-### File: `.github/workflows/build-android-aar.yml`
+### File: `.github/workflows/build-and-publish.yml`
 
-```yaml
-name: Build Android AAR
+The workflow is triggered by:
 
-on:
-  push:
-    branches:
-      - main
-      - master
-      - develop
-    tags:
-      - 'v*'
-  pull_request:
-    branches:
-      - main
-      - master
-  workflow_dispatch:  # Allow manual trigger
+1. **Git Tags** matching `v*` (e.g., `v1.0.0`, `v1.1.0`)
+2. **Manual Trigger** via GitHub UI with `publish: true`
+3. **Pushes to main/develop** (builds only, no publish)
 
-jobs:
-  build-android-aar:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-      
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-      
-      - name: Install Android NDK
-        run: |
-          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.1.12297006"
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.1.12297006" >> $GITHUB_ENV
-      
-      - name: Install uniffi-bindgen
-        run: cargo install uniffi --features=cli
-      
-      - name: Build Rust for Android
-        run: ./build-scripts/build-android.sh
-      
-      - name: Build Android AAR
-        run: |
-          cd matrix-crypto-android
-          ./gradlew build
-      
-      - name: Upload AAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-aar
-          path: matrix-crypto-android/build/outputs/aar/
-          retention-days: 30
-      
-      - name: Upload to Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: matrix-crypto-android/build/outputs/aar/**/*.aar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+### Workflow Structure
+
 ```
+┌─────────────────────────────────────────────────────────────┐
+│ Trigger: Push tag (v*) or manual workflow_dispatch         │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+         ┌───────────────┴───────────────┐
+         │                               │
+    ┌────▼─────┐                    ┌────▼──────────┐
+    │ build-ios │                    │ build-android │
+    │ (macOS)   │                    │ (Ubuntu)      │
+    └────┬─────┘                    └────┬──────────┘
+         │                               │
+         │  aarch64-apple-ios            │  aarch64-linux-android
+         │  x86_64-apple-ios             │  armv7-linux-androideabi
+         │                               │  x86_64-linux-android
+         │                               │
+         └───────────────┬───────────────┘
+                         │
+                    ┌────▼────────┐
+                    │   package   │
+                    │ (Ubuntu)    │
+                    └────┬────────┘
+                         │
+                    ┌────▼────────┐
+                    │  publish    │
+                    │ (if tagged) │
+                    └────┬────────┘
+                         │
+                    ┌────▼────────┐
+                    │   notify    │
+                    │ (always)    │
+                    └─────────────┘
+```
+
+### Job Details
+
+#### Job 1: build-ios
+
+**Runs on:** `macos-latest`
+
+**Strategy:** Matrix build for two targets
+- `aarch64-apple-ios` (device)
+- `x86_64-apple-ios` (simulator)
+
+**Steps:**
+1. Checkout code
+2. Setup Rust with iOS targets
+3. Cache Rust build
+4. Build iOS library
+5. Upload artifact (1-day retention)
+
+**Output:** `libmatrix_crypto_core.a` files
+
+#### Job 2: build-android
+
+**Runs on:** `ubuntu-latest`
+
+**Targets:**
+- `aarch64-linux-android` (ARM64)
+- `armv7-linux-androideabi` (ARMv7)
+- `x86_64-linux-android` (x86_64)
+
+**Steps:**
+1. Checkout code
+2. Setup Rust with Android targets
+3. Setup Android NDK r25c
+4. Cache Rust build
+5. Build for all Android architectures
+6. Upload artifact (1-day retention)
+
+**Output:** `libmatrix_crypto_core.so` files
+
+#### Job 3: package
+
+**Runs on:** `ubuntu-latest`
+
+**Dependencies:** Requires build-ios and build-android to complete
+
+**Steps:**
+1. Download iOS artifacts
+2. Download Android artifacts
+3. Organize iOS libraries
+4. Organize Android libraries
+5. Setup Node.js 18
+6. Install dependencies
+7. Build TypeScript
+8. Verify package contents
+9. Upload packaged artifact (7-day retention)
+
+**Output:** Complete NPM package with native libraries
+
+#### Job 4: publish
+
+**Runs on:** `ubuntu-latest`
+
+**Condition:** Only runs if git tag matches `v*` OR manual trigger with `publish: true`
+
+**Steps:**
+1. Download packaged artifact
+2. Setup Node.js with NPM registry
+3. Publish to NPM with `--access public`
+4. Create GitHub Release with build information
+
+**Requires:** `NPM_TOKEN` secret
+
+#### Job 5: notify
+
+**Runs on:** `ubuntu-latest`
+
+**Condition:** Always runs
+
+**Steps:**
+1. Check build status
+2. Comment on PR if applicable
 
 ---
 
 ## Setup Instructions
 
-### Step 1: Create GitHub Actions Workflow File
+### Step 1: Create GitHub Secrets
 
-1. In your repository, create the directory structure:
-   ```bash
-   mkdir -p .github/workflows
-   ```
+1. Go to your GitHub repository
+2. Click **Settings → Secrets and variables → Actions**
+3. Click **New repository secret**
+4. Add the following secret:
 
-2. Create the workflow file:
-   ```bash
-   touch .github/workflows/build-android-aar.yml
-   ```
+| Secret Name | Value |
+|-------------|-------|
+| `NPM_TOKEN` | Your NPM authentication token |
 
-3. Copy the workflow YAML above into the file
+**To create NPM token:**
+```bash
+npm login
+npm token create --read-only
+```
 
-4. Commit and push:
-   ```bash
-   git add .github/workflows/build-android-aar.yml
-   git commit -m "Add: GitHub Actions workflow for Android AAR building"
-   git push origin master
-   ```
+### Step 2: Add GitHub Actions Workflow
 
-### Step 2: Verify Workflow Setup
+The workflow file should be at `.github/workflows/build-and-publish.yml`
+
+If not already present:
+
+```bash
+mkdir -p .github/workflows
+touch .github/workflows/build-and-publish.yml
+```
+
+Copy the workflow YAML content into the file.
+
+### Step 3: Verify Workflow Setup
 
 1. Go to your GitHub repository
 2. Click the **Actions** tab
-3. You should see the workflow listed as "Build Android AAR"
+3. You should see "Build and Publish to NPM" workflow listed
 4. Click on it to view workflow details
 
-### Step 3: Trigger a Build
+### Step 4: Test Local Build
 
-The workflow will automatically trigger on:
-- **Push to main/master/develop** — Every commit
-- **Pull requests** — For code review
-- **Tags** — When you create a release tag (e.g., `v1.0.0`)
-- **Manual trigger** — Click "Run workflow" in the Actions tab
+Before publishing, test the build scripts locally:
 
-### Step 4: Download Build Artifacts
+```bash
+# Build all platforms
+bash build-scripts/build-and-package.sh all
 
-After the workflow completes:
+# Verify package contents
+ls -la react-native-matrix-crypto/ios/prebuilt/
+ls -la react-native-matrix-crypto/android/src/main/jniLibs/
 
-1. Go to **Actions** tab
-2. Click the latest workflow run
-3. Scroll to **Artifacts** section
-4. Download `android-aar` (contains the `.aar` file)
+# Build TypeScript
+cd react-native-matrix-crypto
+npm run build
+```
+
+### Step 5: Create Release
+
+To trigger the automated build and publish:
+
+```bash
+# Update version
+npm version patch    # or minor/major
+
+# Create git tag
+git tag -a v1.1.0 -m "Release v1.1.0"
+
+# Push to GitHub
+git push origin main
+git push origin v1.1.0
+```
+
+The GitHub Actions workflow will automatically:
+1. Build iOS and Android libraries
+2. Package for NPM
+3. Publish to NPM
+4. Create GitHub Release
+
+---
+
+## Build Process
+
+### Local Development
+
+For local testing before publishing:
+
+```bash
+# Build and package all platforms
+bash build-scripts/build-and-package.sh all
+
+# Create npm link for testing
+bash build-scripts/build-local.sh
+
+# Test in Fortress app
+cd /path/to/fortress
+npm link @k9o/react-native-matrix-crypto
+cd ios && pod install && cd ..
+npm run dev:ios
+
+# Unlink when done
+npm unlink @k9o/react-native-matrix-crypto
+```
+
+### Automated Build (GitHub Actions)
+
+The CI/CD pipeline automatically builds when:
+
+1. **Git tag is pushed** (e.g., `v1.0.0`)
+   - Builds iOS and Android
+   - Packages for NPM
+   - Publishes to NPM
+   - Creates GitHub Release
+
+2. **Manual trigger**
+   - Go to Actions tab
+   - Select "Build and Publish to NPM"
+   - Click "Run workflow"
+   - Set "Publish to NPM" to true
+   - Click "Run workflow"
+
+3. **Push to main/develop** (no tag)
+   - Builds iOS and Android
+   - Packages for NPM
+   - Does NOT publish
+
+---
+
+## Publishing to NPM
+
+### Automatic Publishing (Recommended)
+
+```bash
+# 1. Update version
+npm version patch
+
+# 2. Create git tag
+git tag -a v1.1.0 -m "Release v1.1.0"
+
+# 3. Push to GitHub
+git push origin main
+git push origin v1.1.0
+
+# GitHub Actions automatically publishes
+```
+
+### Manual Publishing
+
+If you need to publish manually:
+
+```bash
+cd react-native-matrix-crypto
+
+# Ensure everything is built
+npm run build
+
+# Verify package contents
+npm pack --dry-run
+
+# Publish to NPM
+npm publish --access public
+
+# Or with specific tag
+npm publish --tag beta --access public
+```
+
+### Verify Publication
+
+```bash
+# Check NPM registry
+npm view @k9o/react-native-matrix-crypto
+
+# View specific version
+npm view @k9o/react-native-matrix-crypto@1.1.0
+
+# List all versions
+npm view @k9o/react-native-matrix-crypto versions
+```
 
 ---
 
 ## Build Artifacts
 
-### Output Structure
+### Package Structure
 
 ```
-matrix-crypto-android/build/outputs/aar/
-├── matrix-crypto-android-debug.aar
-└── matrix-crypto-android-release.aar
+@k9o/react-native-matrix-crypto@1.1.0
+├── lib/                          # Compiled TypeScript
+│   ├── index.js
+│   ├── CryptoAPI.js
+│   ├── NativeMatrixCrypto.js
+│   └── index.d.ts
+├── src/                          # TypeScript source
+├── ios/
+│   ├── react-native-matrix-crypto.podspec
+│   ├── prebuilt/
+│   │   ├── libmatrix_crypto_core_arm64.a
+│   │   └── libmatrix_crypto_core_sim.a
+│   └── RNMatrixCryptoModule.swift
+├── android/
+│   ├── build.gradle
+│   ├── src/main/jniLibs/
+│   │   ├── arm64-v8a/libmatrix_crypto_core.so
+│   │   ├── armeabi-v7a/libmatrix_crypto_core.so
+│   │   └── x86_64/libmatrix_crypto_core.so
+│   └── RNMatrixCryptoModule.kt
+├── package.json
+└── README.md
 ```
 
-### Using the AAR in Your Project
+### Artifact Retention
 
-#### Option 1: Manual Import (Android Studio)
-
-1. In Android Studio, go to **File → New → Import Module**
-2. Select the AAR file
-3. Add to your app's `build.gradle`:
-   ```gradle
-   dependencies {
-       implementation project(':matrix-crypto-android')
-   }
-   ```
-
-#### Option 2: Maven Local Repository
-
-1. Publish AAR to local Maven repository:
-   ```bash
-   cd matrix-crypto-android
-   ./gradlew publishToMavenLocal
-   ```
-
-2. In your app's `build.gradle`:
-   ```gradle
-   repositories {
-       mavenLocal()
-   }
-   
-   dependencies {
-       implementation 'com.matrix.crypto:matrix-crypto-android:0.1.0'
-   }
-   ```
-
-#### Option 3: GitHub Packages (Recommended)
-
-1. Create a Personal Access Token (PAT) in GitHub:
-   - Go to **Settings → Developer settings → Personal access tokens**
-   - Click **Generate new token (classic)**
-   - Select `write:packages` and `read:packages`
-   - Copy the token
-
-2. Update `matrix-crypto-android/build.gradle`:
-   ```gradle
-   publishing {
-       repositories {
-           maven {
-               name = "GitHubPackages"
-               url = uri("https://maven.pkg.github.com/techscorpion-dev/matrix-crypto-bridge")
-               credentials {
-                   username = System.getenv("GITHUB_ACTOR")
-                   password = System.getenv("GITHUB_TOKEN")
-               }
-           }
-       }
-       publications {
-           gpr(MavenPublication) {
-               from(components.release)
-           }
-       }
-   }
-   ```
-
-3. Add publish step to workflow:
-   ```yaml
-   - name: Publish to GitHub Packages
-     if: startsWith(github.ref, 'refs/tags/')
-     run: |
-       cd matrix-crypto-android
-       ./gradlew publish
-     env:
-       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-   ```
-
-4. In your app's `build.gradle`:
-   ```gradle
-   repositories {
-       maven {
-           url = uri("https://maven.pkg.github.com/techscorpion-dev/matrix-crypto-bridge")
-           credentials {
-               username = System.getenv("GITHUB_ACTOR")
-               password = System.getenv("GITHUB_TOKEN")
-           }
-       }
-   }
-   
-   dependencies {
-       implementation 'com.matrix.crypto:matrix-crypto-android:0.1.0'
-   }
-   ```
-
----
-
-## Advanced Configuration
-
-### Build on Multiple Platforms
-
-To build on macOS and Windows in addition to Linux:
-
-```yaml
-strategy:
-  matrix:
-    os: [ubuntu-latest, macos-latest, windows-latest]
-
-runs-on: ${{ matrix.os }}
-
-steps:
-  - name: Setup NDK (macOS)
-    if: runner.os == 'macOS'
-    run: |
-      brew install android-ndk
-      echo "ANDROID_NDK_HOME=$(brew --prefix android-ndk)" >> $GITHUB_ENV
-  
-  - name: Setup NDK (Windows)
-    if: runner.os == 'Windows'
-    run: |
-      # Windows setup instructions
-```
-
-### Conditional Builds
-
-Build only when specific files change:
-
-```yaml
-on:
-  push:
-    paths:
-      - 'matrix-crypto-core/**'
-      - 'matrix-crypto-android/**'
-      - 'build-scripts/**'
-      - '.github/workflows/build-android-aar.yml'
-```
-
-### Scheduled Builds
-
-Build daily at 2 AM UTC:
-
-```yaml
-on:
-  schedule:
-    - cron: '0 2 * * *'
-```
-
-### Build Status Badge
-
-Add to your README.md:
-
-```markdown
-![Build Android AAR](https://github.com/techscorpion-dev/matrix-crypto-bridge/actions/workflows/build-android-aar.yml/badge.svg)
-```
+| Artifact | Retention | Purpose |
+|----------|-----------|---------|
+| iOS libraries | 1 day | Build cache |
+| Android libraries | 1 day | Build cache |
+| NPM package | 7 days | Backup |
+| GitHub Release | Permanent | Public distribution |
 
 ---
 
 ## Troubleshooting
 
-### Issue: "NDK not found"
-
-**Solution:** Ensure the NDK version in the workflow matches your local setup:
-
-```yaml
-- name: Install Android NDK
-  run: |
-    $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.1.12297006"
-    echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.1.12297006" >> $GITHUB_ENV
-```
-
-### Issue: "Gradle build failed"
-
-**Solution:** Check the Gradle build output and ensure:
-1. Java version is 17 or higher
-2. Android SDK is properly installed
-3. `build.gradle` has correct dependencies
-
 ### Issue: "Workflow not triggering"
 
-**Solution:** 
-1. Verify the workflow file is in `.github/workflows/`
-2. Check branch name matches the `on.push.branches` configuration
-3. Manually trigger with **Run workflow** button
+**Solution:**
+1. Verify the workflow file is in `.github/workflows/build-and-publish.yml`
+2. Check branch name matches trigger conditions
+3. Ensure git tag matches `v*` pattern
+4. Manually trigger via Actions tab
+
+### Issue: "Build failed: NDK not found"
+
+**Solution:**
+- The workflow uses NDK r25c
+- Ensure `ANDROID_NDK_HOME` is set correctly
+- Check NDK version compatibility
+
+### Issue: "NPM publish failed"
+
+**Solution:**
+1. Verify `NPM_TOKEN` secret is set
+2. Check token has `write:packages` permission
+3. Verify package name is correct
+4. Check version number is unique
 
 ### Issue: "Artifacts not uploading"
 
-**Solution:** Ensure the AAR file path is correct:
-```bash
-# Verify AAR exists
-ls -la matrix-crypto-android/build/outputs/aar/
-```
+**Solution:**
+1. Verify artifact paths are correct
+2. Check that build completed successfully
+3. Ensure retention days are set
+
+### Issue: "GitHub Release not created"
+
+**Solution:**
+1. Verify git tag matches `v*` pattern
+2. Check `GITHUB_TOKEN` has permissions
+3. Ensure publish job completed successfully
 
 ---
 
 ## Best Practices
 
-1. **Use tags for releases:**
+1. **Use semantic versioning:**
    ```bash
-   git tag -a v1.0.0 -m "Release version 1.0.0"
-   git push origin v1.0.0
+   npm version patch    # Bug fixes (1.0.0 → 1.0.1)
+   npm version minor    # New features (1.0.0 → 1.1.0)
+   npm version major    # Breaking changes (1.0.0 → 2.0.0)
    ```
 
-2. **Automate version bumping:**
-   - Use `semantic-release` or `conventional-commits`
-   - Automatically create releases on version change
-
-3. **Test before building:**
-   - Add unit tests to the pipeline
-   - Run lint checks
-   - Validate Kotlin code
-
-4. **Monitor build status:**
-   - Set up Slack notifications
-   - Configure email alerts
-   - Use GitHub status checks
-
-5. **Cache dependencies:**
-   ```yaml
-   - name: Cache Rust
-     uses: Swatinem/rust-cache@v2
-   
-   - name: Cache Gradle
-     uses: gradle/gradle-build-action@v2
+2. **Test locally before publishing:**
+   ```bash
+   bash build-scripts/build-local.sh
+   npm link
+   # Test in app
+   npm unlink
    ```
+
+3. **Update changelog:**
+   - Document all changes
+   - Include breaking changes
+   - Link to related issues
+
+4. **Verify package contents:**
+   ```bash
+   npm pack --dry-run
+   ```
+
+5. **Monitor build status:**
+   - Check Actions tab regularly
+   - Set up email notifications
+   - Review build logs for warnings
 
 ---
 
 ## Next Steps
 
-1. Create the workflow file in your repository
-2. Push to GitHub
-3. Verify the workflow appears in the Actions tab
-4. Trigger a manual build to test
-5. Download and verify the AAR artifact
-6. Integrate into your React Native app
+1. Add `NPM_TOKEN` secret to GitHub
+2. Verify workflow file is in place
+3. Test local build with `build-scripts/build-and-package.sh all`
+4. Create a test release with `npm version patch`
+5. Push git tag to trigger automated build
+6. Verify package on NPM registry
+7. Test installation in new project
 
-For questions or issues, refer to:
+---
+
+## Resources
+
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Android Gradle Plugin Documentation](https://developer.android.com/studio/build)
-- [Rust Android Documentation](https://rust-lang.github.io/rustup/cross-compilation.html)
+- [NPM Publishing Guide](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry)
+- [Semantic Versioning](https://semver.org/)
+- [React Native Native Modules](https://reactnative.dev/docs/native-modules-intro)
+- [CocoaPods Documentation](https://guides.cocoapods.org/)
+- [Gradle Documentation](https://gradle.org/guides/)
