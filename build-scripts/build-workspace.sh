@@ -191,6 +191,11 @@ build_android() {
         print_subsection "Building for $target..."
         
         cd "$PROJECT_ROOT"
+        
+        # Set up NDK environment variables for cargo-ndk
+        export ANDROID_NDK_HOME="$ANDROID_NDK_HOME"
+        export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+        
         # Use cargo ndk as a cargo subcommand (must be invoked via cargo)
         print_info "Invoking: cargo ndk -t $target build -p matrix-crypto-android --release"
         if cargo ndk -t "$target" build -p matrix-crypto-android --release; then
