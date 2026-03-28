@@ -1,0 +1,169 @@
+name: Build and Publish to NPM (Workspace)
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build iOS Libraries
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [aarch64-apple-ios, x86_64-apple-ios]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-rust-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rust-${{ matrix.target }}-
+
+      - name: Build iOS library (Workspace)
+        run: |
+          cargo build -p matrix-crypto-ios \
+            --target ${{ matrix.target }} \
+            --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-libs-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/libmatrix_crypto_ios.a
+          retention-days: 1
+
+  build-android:
+    name: Build Android Libraries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-linux-android
+          - armv7-linux-androideabi
+          - x86_64-linux-android
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+
+      - name: Cache Rust build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-rust-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rust-${{ matrix.target }}-
+
+      - name: Build Android library (Workspace)
+        run: |
+          cargo build -p matrix-crypto-android \
+            --target ${{ matrix.target }} \
+            --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-libs-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/libmatrix_crypto_android.so
+          retention-days: 1
+
+  package:
+    name: Package for NPM
+    needs: [build-ios, build-android]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Copy libraries to package
+        run: |
+          bash build-scripts/build-workspace.sh all
+
+      - name: Install dependencies
+        run: cd react-native-matrix-crypto && npm install
+
+      - name: Publish to NPM
+        if: startsWith(github.ref, 'refs/tags/v' )
+        run: |
+          cd react-native-matrix-crypto
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: context.ref.replace('refs/tags/', ''),
+              name: `Release ${context.ref.replace('refs/tags/', '')}`,
+              body: 'Pre-built native libraries for Android and iOS\n\n- iOS: aarch64 (device) + x86_64 (simulator)\n- Android: aarch64, armv7, x86_64\n\nInstall with: npm install @k9o/react-native-matrix-crypto'
+            })
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify on Completion
+    needs: [build-ios, build-android, package]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build-ios.result }}" == "failure" ] || \
+             [ "${{ needs.build-android.result }}" == "failure" ] || \
+             [ "${{ needs.package.result }}" == "failure" ]; then
+            echo "❌ Build failed!"
+            exit 1
+          fi
+          echo "✅ Build succeeded!"
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request' && success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Workspace build and packaging completed successfully!\n\n- iOS libraries (aarch64 + x86_64) built and packaged\n- Android libraries (aarch64, armv7, x86_64) built and packaged\n- Ready for NPM publishing'
+            })
