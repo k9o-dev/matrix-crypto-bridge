@@ -132,48 +132,69 @@ build_android() {
     local android_output_dir="$DIST_DIR/android"
     mkdir -p "$android_output_dir"
     
-    # Check for NDK - use the one set by setup-ndk action if available
+    # Find a valid NDK installation (must have source.properties)
+    find_valid_ndk() {
+        local candidate="$1"
+        # Resolve symlinks
+        candidate="$(cd "$candidate" && pwd -P 2>/dev/null || echo "$candidate")"
+        if [ -f "$candidate/source.properties" ]; then
+            echo "$candidate"
+            return 0
+        fi
+        return 1
+    }
+    
     if [ -z "$ANDROID_NDK_HOME" ]; then
-        print_warning "ANDROID_NDK_HOME not set - attempting to use default locations"
+        print_warning "ANDROID_NDK_HOME not set - searching for valid NDK installation"
         
-        # Try /opt/hostedtoolcache/ndk first (GitHub Actions setup-ndk location)
-        if [ -d "/opt/hostedtoolcache/ndk" ]; then
-            export ANDROID_NDK_HOME="/opt/hostedtoolcache/ndk/$(ls -1 /opt/hostedtoolcache/ndk | sort -V | tail -1)"
-            print_info "Found NDK at GitHub Actions location: $ANDROID_NDK_HOME"
-        # Try ANDROID_SDK_ROOT (may have multiple NDK versions - use oldest/first)
-        elif [ ! -z "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
-            export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$(ls -1 $ANDROID_SDK_ROOT/ndk | sort -V | head -1)"
-            print_info "Found NDK via ANDROID_SDK_ROOT: $ANDROID_NDK_HOME"
+        # Try ANDROID_SDK_ROOT/ndk (GitHub Actions pre-installed NDK)
+        if [ ! -z "$ANDROID_SDK_ROOT" ] && [ -d "$ANDROID_SDK_ROOT/ndk" ]; then
+            for ndk_dir in $(ls -1d $ANDROID_SDK_ROOT/ndk/*/  2>/dev/null | sort -V); do
+                if resolved=$(find_valid_ndk "$ndk_dir"); then
+                    export ANDROID_NDK_HOME="$resolved"
+                    print_info "Found valid NDK at: $ANDROID_NDK_HOME"
+                    break
+                fi
+            done
+        fi
+        
+        # Try /usr/local/lib/android/sdk/ndk (GitHub Actions default)
+        if [ -z "$ANDROID_NDK_HOME" ] && [ -d "/usr/local/lib/android/sdk/ndk" ]; then
+            for ndk_dir in $(ls -1d /usr/local/lib/android/sdk/ndk/*/ 2>/dev/null | sort -V); do
+                if resolved=$(find_valid_ndk "$ndk_dir"); then
+                    export ANDROID_NDK_HOME="$resolved"
+                    print_info "Found valid NDK at: $ANDROID_NDK_HOME"
+                    break
+                fi
+            done
+        fi
+        
         # Try standard Android SDK location
-        elif [ -d "$HOME/Android/Sdk/ndk" ]; then
-            export ANDROID_NDK_HOME="$HOME/Android/Sdk/ndk/$(ls -1 $HOME/Android/Sdk/ndk | sort -V | head -1)"
-            print_info "Found NDK at standard location: $ANDROID_NDK_HOME"
-        else
-            print_error "ANDROID_NDK_HOME not set and NDK not found in standard locations"
-            print_info "Checked locations:"
-            print_info "  - /opt/hostedtoolcache/ndk (GitHub Actions)"
-            print_info "  - ANDROID_SDK_ROOT/ndk (setup-ndk action)"
-            print_info "  - $HOME/Android/Sdk/ndk (Standard Android SDK)"
-            print_info "Please set ANDROID_NDK_HOME environment variable"
+        if [ -z "$ANDROID_NDK_HOME" ] && [ -d "$HOME/Android/Sdk/ndk" ]; then
+            for ndk_dir in $(ls -1d $HOME/Android/Sdk/ndk/*/ 2>/dev/null | sort -V); do
+                if resolved=$(find_valid_ndk "$ndk_dir"); then
+                    export ANDROID_NDK_HOME="$resolved"
+                    print_info "Found valid NDK at: $ANDROID_NDK_HOME"
+                    break
+                fi
+            done
+        fi
+        
+        if [ -z "$ANDROID_NDK_HOME" ]; then
+            print_error "No valid NDK installation found (with source.properties)"
+            print_info "Please set ANDROID_NDK_HOME to a valid NDK directory"
             return 1
         fi
     fi
     
-    # Verify NDK installation and resolve symlinks
-    if [ ! -d "$ANDROID_NDK_HOME" ]; then
-        print_error "ANDROID_NDK_HOME points to non-existent directory: $ANDROID_NDK_HOME"
+    # Verify NDK has source.properties
+    if [ ! -f "$ANDROID_NDK_HOME/source.properties" ]; then
+        print_error "ANDROID_NDK_HOME ($ANDROID_NDK_HOME) does not contain source.properties"
         return 1
     fi
     
-    # Resolve symlinks to get the real NDK path
-    export ANDROID_NDK_HOME="$(cd "$ANDROID_NDK_HOME" && pwd -P)"
-    print_info "Using NDK (resolved): $ANDROID_NDK_HOME"
-    
-    if [ -f "$ANDROID_NDK_HOME/source.properties" ]; then
-        print_info "NDK version: $(grep 'Pkg.Revision' $ANDROID_NDK_HOME/source.properties)"
-    else
-        print_warning "source.properties not found at $ANDROID_NDK_HOME/source.properties"
-    fi
+    print_info "Using NDK: $ANDROID_NDK_HOME"
+    print_info "NDK version: $(grep 'Pkg.Revision' $ANDROID_NDK_HOME/source.properties)"
     
     # Verify and install Rust targets
     print_subsection "Verifying Rust targets..."
