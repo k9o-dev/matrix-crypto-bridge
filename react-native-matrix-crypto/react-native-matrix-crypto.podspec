@@ -11,12 +11,16 @@ Pod::Spec.new do |s|
   s.authors      = package["author"]
   s.platforms    = { :ios => "11.0" }
   s.source       = { :git => package["repository"]["url"], :tag => "#{s.version}" }
+  
+  # For local development, use path-based dependency
+  # For published versions, CocoaPods will use the version from the registry
+  # This allows `pod install` to work with the local MatrixCryptoBridge.podspec
 
   s.source_files = "ios/**/*.{h,m,mm,swift}"
   s.requires_arc = true
 
   s.dependency "React-Core"
-  s.dependency "MatrixCryptoBridge"
+  s.dependency "MatrixCryptoBridge", :path => "../MatrixCryptoBridge.podspec"
 
   s.pod_target_xcconfig = {
     "DEFINES_MODULE" => "YES",
