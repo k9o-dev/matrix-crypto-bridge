@@ -251,8 +251,14 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "Version: $VERSION"
 
-          # Install CocoaPods if not already installed
-          gem install cocoapods
+          # Install CocoaPods with user-level gem installation
+          gem install --user-install cocoapods
+
+          # Add user gem bin to PATH
+          export PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH"
+
+          # Verify pod command is available
+          which pod || echo "pod command not found"
 
           # Lint the podspec
           pod spec lint MatrixCryptoBridge.podspec --allow-warnings
