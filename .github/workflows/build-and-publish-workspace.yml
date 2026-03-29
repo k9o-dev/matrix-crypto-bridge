@@ -251,6 +251,14 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "Version: $VERSION"
 
+          # Calculate SHA256 of the distribution archive
+          SHA256=$(cat matrix-crypto-bridge-dist.tar.gz.sha256 | awk '{print $1}')
+          echo "Archive SHA256: $SHA256"
+
+          # Update podspec with correct SHA256
+          sed -i "s/placeholder_sha256_will_be_updated_in_ci/$SHA256/g" MatrixCryptoBridge.podspec
+          echo "Updated podspec with SHA256: $SHA256"
+
           # Install CocoaPods with user-level gem installation
           gem install --user-install cocoapods
 
@@ -269,6 +277,7 @@ jobs:
           echo "✓ MatrixCryptoBridge published to CocoaPods"
         env:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+
   publish-npm:
     name: Publish to NPM
     needs: [create-distribution, publish-release]
