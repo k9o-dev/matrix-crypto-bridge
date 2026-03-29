@@ -21,26 +21,19 @@ Pod::Spec.new do |s|
   s.homepage     = "https://github.com/k9o-dev/matrix-crypto-bridge"
   s.license      = { :type => "Apache-2.0", :file => "LICENSE" }
   s.author       = { "k9o" => "support@pmglobaltechnology.com" }
-  s.source       = { :git => "https://github.com/k9o-dev/matrix-crypto-bridge.git", :tag => "v#{s.version}" }
+  
+  # Download pre-built binaries from GitHub Releases
+  s.source       = { 
+    :http => "https://github.com/k9o-dev/matrix-crypto-bridge/releases/download/v#{s.version}/matrix-crypto-bridge-dist.tar.gz",
+    :sha256 => "placeholder_sha256_will_be_updated_in_ci"
+  }
   
   s.platform     = :ios, "11.0"
   s.requires_arc = true
   
-  # Pre-built static libraries
-  # The build process creates universal binaries for both device and simulator
-  s.vendored_libraries = "dist/ios/libmatrix_crypto_ios.a"
+  # Pre-built static library (universal binary for device + simulator)
+  s.vendored_libraries = "ios/libmatrix_crypto_ios.a"
   
-  # Public headers (if any)
-  s.public_header_files = "matrix-crypto-ios/include/**/*.h"
-  s.header_mappings_dir = "matrix-crypto-ios/include"
-  
-  # Module map for Swift interop
-  s.module_map = "matrix-crypto-ios/MatrixCryptoBridge.modulemap"
-  
-  # Compiler flags for linking
-  s.xcconfig = {
-    "OTHER_LDFLAGS" => "-lmatrix_crypto_ios",
-    "LIBRARY_SEARCH_PATHS" => "$(PODS_ROOT)/MatrixCryptoBridge/dist/ios",
-    "HEADER_SEARCH_PATHS" => "$(PODS_ROOT)/MatrixCryptoBridge/matrix-crypto-ios/include"
-  }
+  # Swift module (no C headers needed for Swift interop)
+  s.swift_version = "5.0"
 end
