@@ -341,9 +341,9 @@ generate_swift_bindings() {
     #   s.source_files = ["ios/matrix_crypto.swift", "ios/matrix_cryptoFFI.h", ...]
     for f in matrix_crypto.swift matrix_cryptoFFI.h matrix_cryptoFFI.modulemap; do
         [ -f "$swift_output_dir/$f" ] || continue
-        # dist/swift/ → uploaded as CI artifact, injected by publish-npm job
-        cp "$swift_output_dir/$f" "$swift_output_dir/$f"   # already there
-        # npm package ios/ → used directly when building from source
+        # Copy to npm package ios/ so it is used directly when building from source.
+        # The files already live in dist/swift/ (swift_output_dir) and will be
+        # picked up by the CI artifact upload step — no self-copy needed.
         cp "$swift_output_dir/$f" "$PACKAGE_DIR/ios/$f"
         print_success "Copied $f to npm package ios/"
     done
