@@ -24,26 +24,34 @@ Pod::Spec.new do |s|
 
   # Download pre-built binaries from GitHub Releases.
   # The archive extracts to:
-  #   ios/libmatrix_crypto_ios.a          <- universal static library
-  #   ios/bindings/matrix_crypto.swift    <- UniFFI-generated Swift bindings
-  #   ios/bindings/matrix_cryptoFFI.h     <- UniFFI-generated C header
-  #   ios/bindings/matrix_cryptoFFI.modulemap <- module map
+  #   ios/libmatrix_crypto_ios.a               <- universal static library
+  #   ios/bindings/matrix_crypto.swift         <- UniFFI-generated Swift bindings
+  #   ios/bindings/matrix_cryptoFFI.h          <- UniFFI-generated C header
+  #   ios/bindings/matrix_cryptoFFI.modulemap  <- module map
+  #   ios/bridge/MatrixCryptoBridge.swift      <- Swift singleton wrapper
+  #   ios/bridge/RNMatrixCryptoModule.swift    <- React Native module implementation
+  #   ios/bridge/RNMatrixCrypto.m              <- ObjC RCT_EXTERN_MODULE registration
   #   LICENSE
   s.source       = {
     :http => "https://github.com/k9o-dev/matrix-crypto-bridge/releases/download/v#{s.version}/matrix-crypto-bridge-dist.tar.gz",
     :sha256 => "placeholder_sha256_will_be_updated_in_ci"
   }
 
-  s.platform     = :ios, "11.0"
+  s.platform     = :ios, "13.0"
   s.requires_arc = true
-  s.swift_version = "5.0"
+  s.swift_version = "5.9"
 
   # Pre-built universal static library
   s.vendored_libraries = "ios/libmatrix_crypto_ios.a"
 
-  # UniFFI-generated Swift bindings (the real MatrixCrypto class with Rust FFI calls)
-  # and the C header that exposes Rust symbols to Swift
-  s.source_files = "ios/bindings/matrix_crypto.swift", "ios/bindings/matrix_cryptoFFI.h"
+  # UniFFI-generated Swift bindings + React Native bridge files
+  s.source_files = [
+    "ios/bindings/matrix_crypto.swift",
+    "ios/bindings/matrix_cryptoFFI.h",
+    "ios/bridge/MatrixCryptoBridge.swift",
+    "ios/bridge/RNMatrixCryptoModule.swift",
+    "ios/bridge/RNMatrixCrypto.m"
+  ]
 
   # C header for the Rust FFI symbols
   s.public_header_files = "ios/bindings/matrix_cryptoFFI.h"
@@ -51,10 +59,12 @@ Pod::Spec.new do |s|
   # Module map that exposes the C FFI symbols as the `matrix_cryptoFFI` Swift module
   s.module_map = "ios/bindings/matrix_cryptoFFI.modulemap"
 
+  s.dependency "React-Core"
+
   # Linker flags needed to resolve Rust runtime symbols in the static library
   s.pod_target_xcconfig = {
-    "OTHER_LDFLAGS" => "-lc++ -lresolv",
+    "OTHER_LDFLAGS"       => "-lc++ -lresolv",
     "SWIFT_INCLUDE_PATHS" => "$(PODS_TARGET_SRCROOT)/ios/bindings",
-    "DEFINES_MODULE" => "YES"
+    "DEFINES_MODULE"      => "YES"
   }
 end
