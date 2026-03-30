@@ -23,15 +23,6 @@ Pod::Spec.new do |s|
   s.author       = { "k9o" => "support@pmglobaltechnology.com" }
 
   # Download pre-built binaries from GitHub Releases.
-  # The archive extracts to:
-  #   ios/libmatrix_crypto_ios.a               <- universal static library
-  #   ios/bindings/matrix_crypto.swift         <- UniFFI-generated Swift bindings
-  #   ios/bindings/matrix_cryptoFFI.h          <- UniFFI-generated C header
-  #   ios/bindings/matrix_cryptoFFI.modulemap  <- module map
-  #   ios/bridge/MatrixCryptoBridge.swift      <- Swift singleton wrapper
-  #   ios/bridge/RNMatrixCryptoModule.swift    <- React Native module implementation
-  #   ios/bridge/RNMatrixCrypto.m              <- ObjC RCT_EXTERN_MODULE registration
-  #   LICENSE
   s.source       = {
     :http => "https://github.com/k9o-dev/matrix-crypto-bridge/releases/download/v#{s.version}/matrix-crypto-bridge-dist.tar.gz",
     :sha256 => "PLACEHOLDER_SHA256"
@@ -46,25 +37,24 @@ Pod::Spec.new do |s|
 
   # UniFFI-generated Swift bindings + React Native bridge files
   s.source_files = [
-    "ios/bindings/matrix_crypto.swift",
-    "ios/bindings/matrix_cryptoFFI.h",
-    "ios/bridge/MatrixCryptoBridge.swift",
-    "ios/bridge/RNMatrixCryptoModule.swift",
-    "ios/bridge/RNMatrixCrypto.m"
+    "ios/matrix_crypto.swift",
+    "ios/matrix_cryptoFFI.h",
+    "ios/MatrixCryptoBridge.swift",
+    "ios/RNMatrixCryptoModule.swift",
+    "ios/RNMatrixCrypto.m"
   ]
 
   # C header for the Rust FFI symbols
-  s.public_header_files = "ios/bindings/matrix_cryptoFFI.h"
+  s.public_header_files = "ios/matrix_cryptoFFI.h"
 
   # Module map that exposes the C FFI symbols as the `matrix_cryptoFFI` Swift module
-  s.module_map = "ios/bindings/matrix_cryptoFFI.modulemap"
+  s.module_map = "ios/matrix_cryptoFFI.modulemap"
 
   s.dependency "React-Core"
 
   # Linker flags needed to resolve Rust runtime symbols in the static library
   s.pod_target_xcconfig = {
-    "OTHER_LDFLAGS"       => "-lc++ -lresolv",
-    "SWIFT_INCLUDE_PATHS" => "$(PODS_TARGET_SRCROOT)/ios/bindings",
-    "DEFINES_MODULE"      => "YES"
+    "OTHER_LDFLAGS"  => "-lc++ -lresolv",
+    "DEFINES_MODULE" => "YES"
   }
 end
