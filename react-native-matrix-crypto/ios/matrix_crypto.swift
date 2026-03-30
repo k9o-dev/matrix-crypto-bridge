@@ -50,11 +50,9 @@ fileprivate extension ForeignBytes {
 
 fileprivate extension Data {
     init(rustBuffer: RustBuffer) {
-        self.init(
-            bytesNoCopy: rustBuffer.data!,
-            count: Int(rustBuffer.len),
-            deallocator: .none
-        )
+        // TODO: This copies the buffer. Can we read directly from a
+        // Rust buffer?
+        self.init(bytes: rustBuffer.data!, count: Int(rustBuffer.len))
     }
 }
 
@@ -155,7 +153,7 @@ fileprivate func writeDouble(_ writer: inout [UInt8], _ value: Double) {
 }
 
 // Protocol for types that transfer other types across the FFI. This is
-// analogous to the Rust trait of the same name.
+// analogous go the Rust trait of the same name.
 fileprivate protocol FfiConverter {
     associatedtype FfiType
     associatedtype SwiftType
@@ -170,16 +168,10 @@ fileprivate protocol FfiConverter {
 fileprivate protocol FfiConverterPrimitive: FfiConverter where FfiType == SwiftType { }
 
 extension FfiConverterPrimitive {
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
     public static func lift(_ value: FfiType) throws -> SwiftType {
         return value
     }
 
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
     public static func lower(_ value: SwiftType) -> FfiType {
         return value
     }
@@ -190,9 +182,6 @@ extension FfiConverterPrimitive {
 fileprivate protocol FfiConverterRustBuffer: FfiConverter where FfiType == RustBuffer {}
 
 extension FfiConverterRustBuffer {
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
     public static func lift(_ buf: RustBuffer) throws -> SwiftType {
         var reader = createReader(data: Data(rustBuffer: buf))
         let value = try read(from: &reader)
@@ -203,9 +192,6 @@ extension FfiConverterRustBuffer {
         return value
     }
 
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
     public static func lower(_ value: SwiftType) -> RustBuffer {
           var writer = createWriter()
           write(value, into: &writer)
@@ -267,30 +253,29 @@ fileprivate extension RustCallStatus {
 }
 
 private func rustCall<T>(_ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
-    let neverThrow: ((RustBuffer) throws -> Never)? = nil
-    return try makeRustCall(callback, errorHandler: neverThrow)
+    try makeRustCall(callback, errorHandler: nil)
 }
 
-private func rustCallWithError<T, E: Swift.Error>(
-    _ errorHandler: @escaping (RustBuffer) throws -> E,
+private func rustCallWithError<T>(
+    _ errorHandler: @escaping (RustBuffer) throws -> Error,
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T) throws -> T {
     try makeRustCall(callback, errorHandler: errorHandler)
 }
 
-private func makeRustCall<T, E: Swift.Error>(
+private func makeRustCall<T>(
     _ callback: (UnsafeMutablePointer<RustCallStatus>) -> T,
-    errorHandler: ((RustBuffer) throws -> E)?
+    errorHandler: ((RustBuffer) throws -> Error)?
 ) throws -> T {
-    uniffiEnsureMatrixCryptoCoreInitialized()
+    uniffiEnsureInitialized()
     var callStatus = RustCallStatus.init()
     let returnedVal = callback(&callStatus)
     try uniffiCheckCallStatus(callStatus: callStatus, errorHandler: errorHandler)
     return returnedVal
 }
 
-private func uniffiCheckCallStatus<E: Swift.Error>(
+private func uniffiCheckCallStatus(
     callStatus: RustCallStatus,
-    errorHandler: ((RustBuffer) throws -> E)?
+    errorHandler: ((RustBuffer) throws -> Error)?
 ) throws {
     switch callStatus.code {
         case CALL_SUCCESS:
@@ -352,29 +337,18 @@ private func uniffiTraitInterfaceCallWithError<T, E>(
         callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
     }
 }
-// Initial value and increment amount for handles. 
-// These ensure that SWIFT handles always have the lowest bit set
-fileprivate let UNIFFI_HANDLEMAP_INITIAL: UInt64 = 1
-fileprivate let UNIFFI_HANDLEMAP_DELTA: UInt64 = 2
-
-fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
-    // All mutation happens with this lock held, which is why we implement @unchecked Sendable.
-    private let lock = NSLock()
+fileprivate class UniffiHandleMap<T> {
     private var map: [UInt64: T] = [:]
-    private var currentHandle: UInt64 = UNIFFI_HANDLEMAP_INITIAL
+    private let lock = NSLock()
+    private var currentHandle: UInt64 = 1
 
     func insert(obj: T) -> UInt64 {
         lock.withLock {
-            return doInsert(obj)
+            let handle = currentHandle
+            currentHandle += 1
+            map[handle] = obj
+            return handle
         }
-    }
-
-    // Low-level insert function, this assumes `lock` is held.
-    private func doInsert(_ obj: T) -> UInt64 {
-        let handle = currentHandle
-        currentHandle += UNIFFI_HANDLEMAP_DELTA
-        map[handle] = obj
-        return handle
     }
 
      func get(handle: UInt64) throws -> T {
@@ -383,15 +357,6 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
                 throw UniffiInternalError.unexpectedStaleHandle
             }
             return obj
-        }
-    }
-
-     func clone(handle: UInt64) throws -> UInt64 {
-        try lock.withLock {
-            guard let obj = map[handle] else {
-                throw UniffiInternalError.unexpectedStaleHandle
-            }
-            return doInsert(obj)
         }
     }
 
@@ -416,9 +381,6 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
 // Public interface members begin here.
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
     typealias FfiType = UInt32
     typealias SwiftType = UInt32
@@ -432,9 +394,6 @@ fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
     }
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
     typealias FfiType = UInt64
     typealias SwiftType = UInt64
@@ -448,9 +407,6 @@ fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
     }
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterBool : FfiConverter {
     typealias FfiType = Int8
     typealias SwiftType = Bool
@@ -472,9 +428,6 @@ fileprivate struct FfiConverterBool : FfiConverter {
     }
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterString: FfiConverter {
     typealias SwiftType = String
     typealias FfiType = RustBuffer
@@ -516,7 +469,7 @@ fileprivate struct FfiConverterString: FfiConverter {
 
 
 
-public protocol MatrixCryptoProtocol: AnyObject, Sendable {
+public protocol MatrixCryptoProtocol : AnyObject {
     
     func addDevice(device: DeviceInfo) throws 
     
@@ -549,140 +502,120 @@ public protocol MatrixCryptoProtocol: AnyObject, Sendable {
     func userId()  -> String
     
 }
-open class MatrixCrypto: MatrixCryptoProtocol, @unchecked Sendable {
-    fileprivate let handle: UInt64
 
-    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public struct NoHandle {
+open class MatrixCrypto:
+    MatrixCryptoProtocol {
+    fileprivate let pointer: UnsafeMutableRawPointer!
+
+    /// Used to instantiate a [FFIObject] without an actual pointer, for fakes in tests, mostly.
+    public struct NoPointer {
         public init() {}
     }
 
     // TODO: We'd like this to be `private` but for Swifty reasons,
     // we can't implement `FfiConverter` without making this `required` and we can't
     // make it `required` without making it `public`.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    required public init(unsafeFromHandle handle: UInt64) {
-        self.handle = handle
+    required public init(unsafeFromRawPointer pointer: UnsafeMutableRawPointer) {
+        self.pointer = pointer
     }
 
-    // This constructor can be used to instantiate a fake object.
-    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
-    //
-    // - Warning:
-    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public init(noHandle: NoHandle) {
-        self.handle = 0
+    /// This constructor can be used to instantiate a fake object.
+    /// - Parameter noPointer: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    ///
+    /// - Warning:
+    ///     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing [Pointer] the FFI lower functions will crash.
+    public init(noPointer: NoPointer) {
+        self.pointer = nil
     }
 
-#if swift(>=5.8)
-    @_documentation(visibility: private)
-#endif
-    public func uniffiCloneHandle() -> UInt64 {
-        return try! rustCall { uniffi_matrix_crypto_core_fn_clone_matrixcrypto(self.handle, $0) }
+    public func uniffiClonePointer() -> UnsafeMutableRawPointer {
+        return try! rustCall { uniffi_matrix_crypto_core_fn_clone_matrixcrypto(self.pointer, $0) }
     }
 public convenience init(userId: String, deviceId: String, pickleKey: String)throws  {
-    let handle =
-        try rustCallWithError(FfiConverterTypeCryptoError_lift) {
+    let pointer =
+        try rustCallWithError(FfiConverterTypeCryptoError.lift) {
     uniffi_matrix_crypto_core_fn_constructor_matrixcrypto_new(
         FfiConverterString.lower(userId),
         FfiConverterString.lower(deviceId),
         FfiConverterString.lower(pickleKey),$0
     )
 }
-    self.init(unsafeFromHandle: handle)
+    self.init(unsafeFromRawPointer: pointer)
 }
 
     deinit {
-        if handle == 0 {
-            // Mock objects have handle=0 don't try to free them
+        guard let pointer = pointer else {
             return
         }
 
-        try! rustCall { uniffi_matrix_crypto_core_fn_free_matrixcrypto(handle, $0) }
+        try! rustCall { uniffi_matrix_crypto_core_fn_free_matrixcrypto(pointer, $0) }
     }
 
     
 
     
-open func addDevice(device: DeviceInfo)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_add_device(
-            self.uniffiCloneHandle(),
-        FfiConverterTypeDeviceInfo_lower(device),$0
+open func addDevice(device: DeviceInfo)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_add_device(self.uniffiClonePointer(),
+        FfiConverterTypeDeviceInfo.lower(device),$0
     )
 }
 }
     
-open func cancelVerification(verificationId: String)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_cancel_verification(
-            self.uniffiCloneHandle(),
+open func cancelVerification(verificationId: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_cancel_verification(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
     )
 }
 }
     
-open func completeVerification(verificationId: String)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_complete_verification(
-            self.uniffiCloneHandle(),
+open func completeVerification(verificationId: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_complete_verification(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
     )
 }
 }
     
-open func confirmSas(verificationId: String)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_confirm_sas(
-            self.uniffiCloneHandle(),
+open func confirmSas(verificationId: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_confirm_sas(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
     )
 }
 }
     
-open func decryptEvent(roomId: String, encryptedContent: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_decrypt_event(
-            self.uniffiCloneHandle(),
+open func decryptEvent(roomId: String, encryptedContent: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_decrypt_event(self.uniffiClonePointer(),
         FfiConverterString.lower(roomId),
         FfiConverterString.lower(encryptedContent),$0
     )
 })
 }
     
-open func deviceFingerprint() -> String  {
+open func deviceFingerprint() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_fingerprint(
-            self.uniffiCloneHandle(),$0
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_fingerprint(self.uniffiClonePointer(),$0
     )
 })
 }
     
-open func deviceId() -> String  {
+open func deviceId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_id(
-            self.uniffiCloneHandle(),$0
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_id(self.uniffiClonePointer(),$0
     )
 })
 }
     
-open func enableRoomEncryption(roomId: String, algorithm: String)throws   {try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_enable_room_encryption(
-            self.uniffiCloneHandle(),
+open func enableRoomEncryption(roomId: String, algorithm: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_enable_room_encryption(self.uniffiClonePointer(),
         FfiConverterString.lower(roomId),
         FfiConverterString.lower(algorithm),$0
     )
 }
 }
     
-open func encryptEvent(roomId: String, eventType: String, content: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_encrypt_event(
-            self.uniffiCloneHandle(),
+open func encryptEvent(roomId: String, eventType: String, content: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_encrypt_event(self.uniffiClonePointer(),
         FfiConverterString.lower(roomId),
         FfiConverterString.lower(eventType),
         FfiConverterString.lower(content),$0
@@ -690,109 +623,101 @@ open func encryptEvent(roomId: String, eventType: String, content: String)throws
 })
 }
     
-open func getRoomEncryptionState(roomId: String)throws  -> RoomEncryptionState  {
-    return try  FfiConverterTypeRoomEncryptionState_lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_room_encryption_state(
-            self.uniffiCloneHandle(),
+open func getRoomEncryptionState(roomId: String)throws  -> RoomEncryptionState {
+    return try  FfiConverterTypeRoomEncryptionState.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_room_encryption_state(self.uniffiClonePointer(),
         FfiConverterString.lower(roomId),$0
     )
 })
 }
     
-open func getSasEmojis(verificationId: String)throws  -> [EmojiSasPair]  {
-    return try  FfiConverterSequenceTypeEmojiSASPair.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_sas_emojis(
-            self.uniffiCloneHandle(),
+open func getSasEmojis(verificationId: String)throws  -> [EmojiSasPair] {
+    return try  FfiConverterSequenceTypeEmojiSASPair.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_sas_emojis(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
     )
 })
 }
     
-open func getUserDevices(userId: String)throws  -> [DeviceInfo]  {
-    return try  FfiConverterSequenceTypeDeviceInfo.lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_user_devices(
-            self.uniffiCloneHandle(),
+open func getUserDevices(userId: String)throws  -> [DeviceInfo] {
+    return try  FfiConverterSequenceTypeDeviceInfo.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_user_devices(self.uniffiClonePointer(),
         FfiConverterString.lower(userId),$0
     )
 })
 }
     
-open func getVerificationState(verificationId: String)throws  -> VerificationState  {
-    return try  FfiConverterTypeVerificationState_lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_verification_state(
-            self.uniffiCloneHandle(),
+open func getVerificationState(verificationId: String)throws  -> VerificationState {
+    return try  FfiConverterTypeVerificationState.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_verification_state(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
     )
 })
 }
     
-open func startVerification(otherUserId: String, otherDeviceId: String)throws  -> VerificationState  {
-    return try  FfiConverterTypeVerificationState_lift(try rustCallWithError(FfiConverterTypeCryptoError_lift) {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_start_verification(
-            self.uniffiCloneHandle(),
+open func startVerification(otherUserId: String, otherDeviceId: String)throws  -> VerificationState {
+    return try  FfiConverterTypeVerificationState.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_start_verification(self.uniffiClonePointer(),
         FfiConverterString.lower(otherUserId),
         FfiConverterString.lower(otherDeviceId),$0
     )
 })
 }
     
-open func userId() -> String  {
+open func userId() -> String {
     return try!  FfiConverterString.lift(try! rustCall() {
-    uniffi_matrix_crypto_core_fn_method_matrixcrypto_user_id(
-            self.uniffiCloneHandle(),$0
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_user_id(self.uniffiClonePointer(),$0
     )
 })
 }
     
 
-    
 }
 
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public struct FfiConverterTypeMatrixCrypto: FfiConverter {
-    typealias FfiType = UInt64
+
+    typealias FfiType = UnsafeMutableRawPointer
     typealias SwiftType = MatrixCrypto
 
-    public static func lift(_ handle: UInt64) throws -> MatrixCrypto {
-        return MatrixCrypto(unsafeFromHandle: handle)
+    public static func lift(_ pointer: UnsafeMutableRawPointer) throws -> MatrixCrypto {
+        return MatrixCrypto(unsafeFromRawPointer: pointer)
     }
 
-    public static func lower(_ value: MatrixCrypto) -> UInt64 {
-        return value.uniffiCloneHandle()
+    public static func lower(_ value: MatrixCrypto) -> UnsafeMutableRawPointer {
+        return value.uniffiClonePointer()
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MatrixCrypto {
-        let handle: UInt64 = try readInt(&buf)
-        return try lift(handle)
+        let v: UInt64 = try readInt(&buf)
+        // The Rust code won't compile if a pointer won't fit in a UInt64.
+        // We have to go via `UInt` because that's the thing that's the size of a pointer.
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(truncatingIfNeeded: v))
+        if (ptr == nil) {
+            throw UniffiInternalError.unexpectedNullPointer
+        }
+        return try lift(ptr!)
     }
 
     public static func write(_ value: MatrixCrypto, into buf: inout [UInt8]) {
-        writeInt(&buf, lower(value))
+        // This fiddling is because `Int` is the thing that's the same size as a pointer.
+        // The Rust code won't compile if a pointer won't fit in a `UInt64`.
+        writeInt(&buf, UInt64(bitPattern: Int64(Int(bitPattern: lower(value)))))
     }
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeMatrixCrypto_lift(_ handle: UInt64) throws -> MatrixCrypto {
-    return try FfiConverterTypeMatrixCrypto.lift(handle)
+
+
+public func FfiConverterTypeMatrixCrypto_lift(_ pointer: UnsafeMutableRawPointer) throws -> MatrixCrypto {
+    return try FfiConverterTypeMatrixCrypto.lift(pointer)
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeMatrixCrypto_lower(_ value: MatrixCrypto) -> UInt64 {
+public func FfiConverterTypeMatrixCrypto_lower(_ value: MatrixCrypto) -> UnsafeMutableRawPointer {
     return FfiConverterTypeMatrixCrypto.lower(value)
 }
 
 
-
-
-public struct DeviceInfo: Equatable, Hashable {
+public struct DeviceInfo {
     public var deviceId: String
     public var userId: String
     public var displayName: String?
@@ -812,19 +737,48 @@ public struct DeviceInfo: Equatable, Hashable {
         self.isBlocked = isBlocked
         self.algorithm = algorithm
     }
-
-    
-
-    
 }
 
-#if compiler(>=6)
-extension DeviceInfo: Sendable {}
-#endif
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
+
+extension DeviceInfo: Equatable, Hashable {
+    public static func ==(lhs: DeviceInfo, rhs: DeviceInfo) -> Bool {
+        if lhs.deviceId != rhs.deviceId {
+            return false
+        }
+        if lhs.userId != rhs.userId {
+            return false
+        }
+        if lhs.displayName != rhs.displayName {
+            return false
+        }
+        if lhs.fingerprint != rhs.fingerprint {
+            return false
+        }
+        if lhs.isVerified != rhs.isVerified {
+            return false
+        }
+        if lhs.isBlocked != rhs.isBlocked {
+            return false
+        }
+        if lhs.algorithm != rhs.algorithm {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(deviceId)
+        hasher.combine(userId)
+        hasher.combine(displayName)
+        hasher.combine(fingerprint)
+        hasher.combine(isVerified)
+        hasher.combine(isBlocked)
+        hasher.combine(algorithm)
+    }
+}
+
+
 public struct FfiConverterTypeDeviceInfo: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DeviceInfo {
         return
@@ -851,22 +805,16 @@ public struct FfiConverterTypeDeviceInfo: FfiConverterRustBuffer {
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeDeviceInfo_lift(_ buf: RustBuffer) throws -> DeviceInfo {
     return try FfiConverterTypeDeviceInfo.lift(buf)
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeDeviceInfo_lower(_ value: DeviceInfo) -> RustBuffer {
     return FfiConverterTypeDeviceInfo.lower(value)
 }
 
 
-public struct EmojiSasPair: Equatable, Hashable {
+public struct EmojiSasPair {
     public var emoji: String
     public var name: String
 
@@ -876,19 +824,28 @@ public struct EmojiSasPair: Equatable, Hashable {
         self.emoji = emoji
         self.name = name
     }
-
-    
-
-    
 }
 
-#if compiler(>=6)
-extension EmojiSasPair: Sendable {}
-#endif
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
+
+extension EmojiSasPair: Equatable, Hashable {
+    public static func ==(lhs: EmojiSasPair, rhs: EmojiSasPair) -> Bool {
+        if lhs.emoji != rhs.emoji {
+            return false
+        }
+        if lhs.name != rhs.name {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(emoji)
+        hasher.combine(name)
+    }
+}
+
+
 public struct FfiConverterTypeEmojiSASPair: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EmojiSasPair {
         return
@@ -905,22 +862,16 @@ public struct FfiConverterTypeEmojiSASPair: FfiConverterRustBuffer {
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeEmojiSASPair_lift(_ buf: RustBuffer) throws -> EmojiSasPair {
     return try FfiConverterTypeEmojiSASPair.lift(buf)
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeEmojiSASPair_lower(_ value: EmojiSasPair) -> RustBuffer {
     return FfiConverterTypeEmojiSASPair.lower(value)
 }
 
 
-public struct EncryptionAlgorithm: Equatable, Hashable {
+public struct EncryptionAlgorithm {
     public var algorithm: String
     public var rotationPeriodMs: UInt64
     public var rotationPeriodMsgs: UInt64
@@ -932,19 +883,32 @@ public struct EncryptionAlgorithm: Equatable, Hashable {
         self.rotationPeriodMs = rotationPeriodMs
         self.rotationPeriodMsgs = rotationPeriodMsgs
     }
-
-    
-
-    
 }
 
-#if compiler(>=6)
-extension EncryptionAlgorithm: Sendable {}
-#endif
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
+
+extension EncryptionAlgorithm: Equatable, Hashable {
+    public static func ==(lhs: EncryptionAlgorithm, rhs: EncryptionAlgorithm) -> Bool {
+        if lhs.algorithm != rhs.algorithm {
+            return false
+        }
+        if lhs.rotationPeriodMs != rhs.rotationPeriodMs {
+            return false
+        }
+        if lhs.rotationPeriodMsgs != rhs.rotationPeriodMsgs {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(algorithm)
+        hasher.combine(rotationPeriodMs)
+        hasher.combine(rotationPeriodMsgs)
+    }
+}
+
+
 public struct FfiConverterTypeEncryptionAlgorithm: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EncryptionAlgorithm {
         return
@@ -963,22 +927,16 @@ public struct FfiConverterTypeEncryptionAlgorithm: FfiConverterRustBuffer {
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeEncryptionAlgorithm_lift(_ buf: RustBuffer) throws -> EncryptionAlgorithm {
     return try FfiConverterTypeEncryptionAlgorithm.lift(buf)
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeEncryptionAlgorithm_lower(_ value: EncryptionAlgorithm) -> RustBuffer {
     return FfiConverterTypeEncryptionAlgorithm.lower(value)
 }
 
 
-public struct RoomEncryptionState: Equatable, Hashable {
+public struct RoomEncryptionState {
     public var roomId: String
     public var isEncrypted: Bool
     public var algorithm: String?
@@ -994,19 +952,40 @@ public struct RoomEncryptionState: Equatable, Hashable {
         self.trustedDevices = trustedDevices
         self.untrustedDevices = untrustedDevices
     }
-
-    
-
-    
 }
 
-#if compiler(>=6)
-extension RoomEncryptionState: Sendable {}
-#endif
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
+
+extension RoomEncryptionState: Equatable, Hashable {
+    public static func ==(lhs: RoomEncryptionState, rhs: RoomEncryptionState) -> Bool {
+        if lhs.roomId != rhs.roomId {
+            return false
+        }
+        if lhs.isEncrypted != rhs.isEncrypted {
+            return false
+        }
+        if lhs.algorithm != rhs.algorithm {
+            return false
+        }
+        if lhs.trustedDevices != rhs.trustedDevices {
+            return false
+        }
+        if lhs.untrustedDevices != rhs.untrustedDevices {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(roomId)
+        hasher.combine(isEncrypted)
+        hasher.combine(algorithm)
+        hasher.combine(trustedDevices)
+        hasher.combine(untrustedDevices)
+    }
+}
+
+
 public struct FfiConverterTypeRoomEncryptionState: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomEncryptionState {
         return
@@ -1029,22 +1008,16 @@ public struct FfiConverterTypeRoomEncryptionState: FfiConverterRustBuffer {
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeRoomEncryptionState_lift(_ buf: RustBuffer) throws -> RoomEncryptionState {
     return try FfiConverterTypeRoomEncryptionState.lift(buf)
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeRoomEncryptionState_lower(_ value: RoomEncryptionState) -> RustBuffer {
     return FfiConverterTypeRoomEncryptionState.lower(value)
 }
 
 
-public struct UserDevices: Equatable, Hashable {
+public struct UserDevices {
     public var userId: String
     public var devices: [DeviceInfo]
 
@@ -1054,19 +1027,28 @@ public struct UserDevices: Equatable, Hashable {
         self.userId = userId
         self.devices = devices
     }
-
-    
-
-    
 }
 
-#if compiler(>=6)
-extension UserDevices: Sendable {}
-#endif
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
+
+extension UserDevices: Equatable, Hashable {
+    public static func ==(lhs: UserDevices, rhs: UserDevices) -> Bool {
+        if lhs.userId != rhs.userId {
+            return false
+        }
+        if lhs.devices != rhs.devices {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(userId)
+        hasher.combine(devices)
+    }
+}
+
+
 public struct FfiConverterTypeUserDevices: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UserDevices {
         return
@@ -1083,22 +1065,16 @@ public struct FfiConverterTypeUserDevices: FfiConverterRustBuffer {
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeUserDevices_lift(_ buf: RustBuffer) throws -> UserDevices {
     return try FfiConverterTypeUserDevices.lift(buf)
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeUserDevices_lower(_ value: UserDevices) -> RustBuffer {
     return FfiConverterTypeUserDevices.lower(value)
 }
 
 
-public struct VerificationState: Equatable, Hashable {
+public struct VerificationState {
     public var verificationId: String
     public var state: String
     public var otherUserId: String
@@ -1116,19 +1092,44 @@ public struct VerificationState: Equatable, Hashable {
         self.emojis = emojis
         self.decimals = decimals
     }
-
-    
-
-    
 }
 
-#if compiler(>=6)
-extension VerificationState: Sendable {}
-#endif
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
+
+extension VerificationState: Equatable, Hashable {
+    public static func ==(lhs: VerificationState, rhs: VerificationState) -> Bool {
+        if lhs.verificationId != rhs.verificationId {
+            return false
+        }
+        if lhs.state != rhs.state {
+            return false
+        }
+        if lhs.otherUserId != rhs.otherUserId {
+            return false
+        }
+        if lhs.otherDeviceId != rhs.otherDeviceId {
+            return false
+        }
+        if lhs.emojis != rhs.emojis {
+            return false
+        }
+        if lhs.decimals != rhs.decimals {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(verificationId)
+        hasher.combine(state)
+        hasher.combine(otherUserId)
+        hasher.combine(otherDeviceId)
+        hasher.combine(emojis)
+        hasher.combine(decimals)
+    }
+}
+
+
 public struct FfiConverterTypeVerificationState: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> VerificationState {
         return
@@ -1153,22 +1154,16 @@ public struct FfiConverterTypeVerificationState: FfiConverterRustBuffer {
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeVerificationState_lift(_ buf: RustBuffer) throws -> VerificationState {
     return try FfiConverterTypeVerificationState.lift(buf)
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public func FfiConverterTypeVerificationState_lower(_ value: VerificationState) -> RustBuffer {
     return FfiConverterTypeVerificationState.lower(value)
 }
 
 
-public enum CryptoError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public enum CryptoError {
 
     
     
@@ -1196,25 +1191,9 @@ public enum CryptoError: Swift.Error, Equatable, Hashable, Foundation.LocalizedE
     
     case Unknown(message: String)
     
-
-    
-
-    
-
-    
-    public var errorDescription: String? {
-        String(reflecting: self)
-    }
-    
 }
 
-#if compiler(>=6)
-extension CryptoError: Sendable {}
-#endif
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 public struct FfiConverterTypeCryptoError: FfiConverterRustBuffer {
     typealias SwiftType = CryptoError
 
@@ -1315,23 +1294,10 @@ public struct FfiConverterTypeCryptoError: FfiConverterRustBuffer {
 }
 
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeCryptoError_lift(_ buf: RustBuffer) throws -> CryptoError {
-    return try FfiConverterTypeCryptoError.lift(buf)
-}
+extension CryptoError: Equatable, Hashable {}
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeCryptoError_lower(_ value: CryptoError) -> RustBuffer {
-    return FfiConverterTypeCryptoError.lower(value)
-}
+extension CryptoError: Error { }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
     typealias SwiftType = String?
 
@@ -1353,9 +1319,6 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
     }
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceUInt32: FfiConverterRustBuffer {
     typealias SwiftType = [UInt32]
 
@@ -1378,9 +1341,6 @@ fileprivate struct FfiConverterSequenceUInt32: FfiConverterRustBuffer {
     }
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
     typealias SwiftType = [String]
 
@@ -1403,9 +1363,6 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
     }
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceTypeDeviceInfo: FfiConverterRustBuffer {
     typealias SwiftType = [DeviceInfo]
 
@@ -1428,9 +1385,6 @@ fileprivate struct FfiConverterSequenceTypeDeviceInfo: FfiConverterRustBuffer {
     }
 }
 
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceTypeEmojiSASPair: FfiConverterRustBuffer {
     typealias SwiftType = [EmojiSasPair]
 
@@ -1458,71 +1412,69 @@ private enum InitializationResult {
     case contractVersionMismatch
     case apiChecksumMismatch
 }
-// Use a global variable to perform the versioning checks. Swift ensures that
+// Use a global variables to perform the versioning checks. Swift ensures that
 // the code inside is only computed once.
-private let initializationResult: InitializationResult = {
+private var initializationResult: InitializationResult {
     // Get the bindings contract version from our ComponentInterface
-    let bindings_contract_version = 30
+    let bindings_contract_version = 26
     // Get the scaffolding contract version by calling the into the dylib
     let scaffolding_contract_version = ffi_matrix_crypto_core_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_add_device() != 7416) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_add_device() != 53634) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_cancel_verification() != 60694) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_cancel_verification() != 46452) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_complete_verification() != 16445) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_complete_verification() != 42092) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_confirm_sas() != 19640) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_confirm_sas() != 3571) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_decrypt_event() != 29667) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_decrypt_event() != 56529) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_device_fingerprint() != 22956) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_device_fingerprint() != 43926) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_device_id() != 59366) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_device_id() != 18408) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_enable_room_encryption() != 19156) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_enable_room_encryption() != 64735) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_encrypt_event() != 32786) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_encrypt_event() != 23966) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_room_encryption_state() != 53908) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_room_encryption_state() != 46073) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_sas_emojis() != 30646) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_sas_emojis() != 55305) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_user_devices() != 53426) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_user_devices() != 11770) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_verification_state() != 8793) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_verification_state() != 46992) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_start_verification() != 42482) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_start_verification() != 54514) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_user_id() != 51351) {
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_user_id() != 41456) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_crypto_core_checksum_constructor_matrixcrypto_new() != 14807) {
+    if (uniffi_matrix_crypto_core_checksum_constructor_matrixcrypto_new() != 34974) {
         return InitializationResult.apiChecksumMismatch
     }
 
     return InitializationResult.ok
-}()
+}
 
-// Make the ensure init function public so that other modules which have external type references to
-// our types can call it.
-public func uniffiEnsureMatrixCryptoCoreInitialized() {
+private func uniffiEnsureInitialized() {
     switch initializationResult {
     case .ok:
         break

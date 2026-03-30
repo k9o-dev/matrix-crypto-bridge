@@ -308,42 +308,46 @@ build_android() {
 # Function to generate Swift bindings (iOS)
 generate_swift_bindings() {
     print_section "Generating Swift Bindings"
-    
+
     local swift_output_dir="$DIST_DIR/swift"
     mkdir -p "$swift_output_dir"
-    
-    print_subsection "Generating Swift bindings..."
-    
-    # Use uniffi-bindgen to generate Swift code
-    if command_exists uniffi-bindgen; then
-        cd "$PROJECT_ROOT"
-        uniffi-bindgen generate \
-            --language swift \
-            matrix-crypto-core/src/matrix_crypto.udl \
-            --out-dir "$swift_output_dir"
-        
-        if [ -f "$swift_output_dir/matrix_crypto.swift" ]; then
-            print_success "Generated Swift bindings"
-            
-            # Copy Swift bindings + C header + module map to package ios/bindings
-            # These three files are all required for CocoaPods to link the Rust static library
-            mkdir -p "$PACKAGE_DIR/ios/bindings"
-            cp "$swift_output_dir/matrix_crypto.swift" "$PACKAGE_DIR/ios/bindings/"
-            [ -f "$swift_output_dir/matrix_cryptoFFI.h" ] && \
-                cp "$swift_output_dir/matrix_cryptoFFI.h" "$PACKAGE_DIR/ios/bindings/" && \
-                print_success "Copied C header (matrix_cryptoFFI.h) to package"
-            [ -f "$swift_output_dir/matrix_cryptoFFI.modulemap" ] && \
-                cp "$swift_output_dir/matrix_cryptoFFI.modulemap" "$PACKAGE_DIR/ios/bindings/" && \
-                print_success "Copied module map (matrix_cryptoFFI.modulemap) to package"
-            print_success "Copied Swift bindings to package"
-        else
-            print_warning "Swift bindings may not have been generated correctly"
-        fi
-    else
-        print_warning "uniffi-bindgen not found - skipping Swift bindings generation"
-        print_info "Install with: cargo install uniffi_bindgen"
+
+    print_subsection "Generating Swift bindings using workspace-local uniffi-bindgen..."
+
+    # IMPORTANT: Always use 'cargo run -p matrix-crypto-core --bin uniffi-bindgen' rather
+    # than a globally-installed uniffi-bindgen. The workspace pins uniffi to a specific version
+    # (see Cargo.lock). A globally-installed uniffi-bindgen may be a different patch version
+    # and will generate a different bindings_contract_version, causing a SIGILL crash at
+    # runtime in uniffiEnsureMatrixCryptoCoreInitialized().
+    cd "$PROJECT_ROOT"
+    cargo run -p matrix-crypto-core --bin uniffi-bindgen -- generate \
+        --language swift \
+        matrix-crypto-core/src/matrix_crypto.udl \
+        --out-dir "$swift_output_dir"
+
+    if [ ! -f "$swift_output_dir/matrix_crypto.swift" ]; then
+        print_error "Swift bindings generation failed — matrix_crypto.swift not produced"
+        print_error "This is a hard failure: the .a and Swift bindings MUST be built from the same uniffi version"
+        return 1
     fi
-    
+
+    print_success "Generated Swift bindings ($(grep 'bindings_contract_version' $swift_output_dir/matrix_crypto.swift | head -1 | tr -d ' '))"
+
+    # Copy generated bindings to dist/swift/ (for CI artifact upload)
+    # and directly into the npm package ios/ directory.
+    #
+    # The bindings MUST be placed in ios/ (not ios/bindings/) because the podspec
+    # sources them from ios/:
+    #   s.source_files = ["ios/matrix_crypto.swift", "ios/matrix_cryptoFFI.h", ...]
+    for f in matrix_crypto.swift matrix_cryptoFFI.h matrix_cryptoFFI.modulemap; do
+        [ -f "$swift_output_dir/$f" ] || continue
+        # dist/swift/ → uploaded as CI artifact, injected by publish-npm job
+        cp "$swift_output_dir/$f" "$swift_output_dir/$f"   # already there
+        # npm package ios/ → used directly when building from source
+        cp "$swift_output_dir/$f" "$PACKAGE_DIR/ios/$f"
+        print_success "Copied $f to npm package ios/"
+    done
+
     return 0
 }
 

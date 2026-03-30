@@ -1,7 +1,11 @@
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock is intentionally NOT ignored — it is tracked in git.
+# Committing Cargo.lock ensures CI always builds with the exact same uniffi
+# crate version that was used to generate the committed Swift bindings.
+# A uniffi version mismatch causes SIGILL at startup (contract version check).
+# !Cargo.lock
 
 # iOS
 *.xcodeproj/xcuserdata/

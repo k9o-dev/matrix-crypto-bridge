@@ -50,9 +50,9 @@ typedef void (*UniffiRustFutureContinuationCallback)(uint64_t, int8_t
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK
-typedef void (*UniffiForeignFutureDroppedCallback)(uint64_t
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_FREE
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_FREE
+typedef void (*UniffiForeignFutureFree)(uint64_t
     );
 
 #endif
@@ -62,275 +62,283 @@ typedef void (*UniffiCallbackInterfaceFree)(uint64_t
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
-#define UNIFFI_FFIDEF_CALLBACK_INTERFACE_CLONE
-typedef uint64_t (*UniffiCallbackInterfaceClone)(uint64_t
-    );
-
-#endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_DROPPED_CALLBACK_STRUCT
-typedef struct UniffiForeignFutureDroppedCallbackStruct {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE
+typedef struct UniffiForeignFuture {
     uint64_t handle;
-    UniffiForeignFutureDroppedCallback _Nonnull free;
-} UniffiForeignFutureDroppedCallbackStruct;
+    UniffiForeignFutureFree _Nonnull free;
+} UniffiForeignFuture;
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U8
-typedef struct UniffiForeignFutureResultU8 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U8
+typedef struct UniffiForeignFutureStructU8 {
     uint8_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultU8;
+} UniffiForeignFutureStructU8;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U8
-typedef void (*UniffiForeignFutureCompleteU8)(uint64_t, UniffiForeignFutureResultU8
+typedef void (*UniffiForeignFutureCompleteU8)(uint64_t, UniffiForeignFutureStructU8
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I8
-typedef struct UniffiForeignFutureResultI8 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I8
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I8
+typedef struct UniffiForeignFutureStructI8 {
     int8_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultI8;
+} UniffiForeignFutureStructI8;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I8
-typedef void (*UniffiForeignFutureCompleteI8)(uint64_t, UniffiForeignFutureResultI8
+typedef void (*UniffiForeignFutureCompleteI8)(uint64_t, UniffiForeignFutureStructI8
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U16
-typedef struct UniffiForeignFutureResultU16 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U16
+typedef struct UniffiForeignFutureStructU16 {
     uint16_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultU16;
+} UniffiForeignFutureStructU16;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U16
-typedef void (*UniffiForeignFutureCompleteU16)(uint64_t, UniffiForeignFutureResultU16
+typedef void (*UniffiForeignFutureCompleteU16)(uint64_t, UniffiForeignFutureStructU16
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I16
-typedef struct UniffiForeignFutureResultI16 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I16
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I16
+typedef struct UniffiForeignFutureStructI16 {
     int16_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultI16;
+} UniffiForeignFutureStructI16;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I16
-typedef void (*UniffiForeignFutureCompleteI16)(uint64_t, UniffiForeignFutureResultI16
+typedef void (*UniffiForeignFutureCompleteI16)(uint64_t, UniffiForeignFutureStructI16
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U32
-typedef struct UniffiForeignFutureResultU32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U32
+typedef struct UniffiForeignFutureStructU32 {
     uint32_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultU32;
+} UniffiForeignFutureStructU32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U32
-typedef void (*UniffiForeignFutureCompleteU32)(uint64_t, UniffiForeignFutureResultU32
+typedef void (*UniffiForeignFutureCompleteU32)(uint64_t, UniffiForeignFutureStructU32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I32
-typedef struct UniffiForeignFutureResultI32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I32
+typedef struct UniffiForeignFutureStructI32 {
     int32_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultI32;
+} UniffiForeignFutureStructI32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I32
-typedef void (*UniffiForeignFutureCompleteI32)(uint64_t, UniffiForeignFutureResultI32
+typedef void (*UniffiForeignFutureCompleteI32)(uint64_t, UniffiForeignFutureStructI32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_U64
-typedef struct UniffiForeignFutureResultU64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_U64
+typedef struct UniffiForeignFutureStructU64 {
     uint64_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultU64;
+} UniffiForeignFutureStructU64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_U64
-typedef void (*UniffiForeignFutureCompleteU64)(uint64_t, UniffiForeignFutureResultU64
+typedef void (*UniffiForeignFutureCompleteU64)(uint64_t, UniffiForeignFutureStructU64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_I64
-typedef struct UniffiForeignFutureResultI64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_I64
+typedef struct UniffiForeignFutureStructI64 {
     int64_t returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultI64;
+} UniffiForeignFutureStructI64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_I64
-typedef void (*UniffiForeignFutureCompleteI64)(uint64_t, UniffiForeignFutureResultI64
+typedef void (*UniffiForeignFutureCompleteI64)(uint64_t, UniffiForeignFutureStructI64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F32
-typedef struct UniffiForeignFutureResultF32 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F32
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F32
+typedef struct UniffiForeignFutureStructF32 {
     float returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultF32;
+} UniffiForeignFutureStructF32;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F32
-typedef void (*UniffiForeignFutureCompleteF32)(uint64_t, UniffiForeignFutureResultF32
+typedef void (*UniffiForeignFutureCompleteF32)(uint64_t, UniffiForeignFutureStructF32
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_F64
-typedef struct UniffiForeignFutureResultF64 {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F64
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_F64
+typedef struct UniffiForeignFutureStructF64 {
     double returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultF64;
+} UniffiForeignFutureStructF64;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_F64
-typedef void (*UniffiForeignFutureCompleteF64)(uint64_t, UniffiForeignFutureResultF64
+typedef void (*UniffiForeignFutureCompleteF64)(uint64_t, UniffiForeignFutureStructF64
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_RUST_BUFFER
-typedef struct UniffiForeignFutureResultRustBuffer {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_POINTER
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_POINTER
+typedef struct UniffiForeignFutureStructPointer {
+    void*_Nonnull returnValue;
+    RustCallStatus callStatus;
+} UniffiForeignFutureStructPointer;
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_POINTER
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_POINTER
+typedef void (*UniffiForeignFutureCompletePointer)(uint64_t, UniffiForeignFutureStructPointer
+    );
+
+#endif
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_RUST_BUFFER
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_RUST_BUFFER
+typedef struct UniffiForeignFutureStructRustBuffer {
     RustBuffer returnValue;
     RustCallStatus callStatus;
-} UniffiForeignFutureResultRustBuffer;
+} UniffiForeignFutureStructRustBuffer;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_RUST_BUFFER
-typedef void (*UniffiForeignFutureCompleteRustBuffer)(uint64_t, UniffiForeignFutureResultRustBuffer
+typedef void (*UniffiForeignFutureCompleteRustBuffer)(uint64_t, UniffiForeignFutureStructRustBuffer
     );
 
 #endif
-#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
-#define UNIFFI_FFIDEF_FOREIGN_FUTURE_RESULT_VOID
-typedef struct UniffiForeignFutureResultVoid {
+#ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_VOID
+#define UNIFFI_FFIDEF_FOREIGN_FUTURE_STRUCT_VOID
+typedef struct UniffiForeignFutureStructVoid {
     RustCallStatus callStatus;
-} UniffiForeignFutureResultVoid;
+} UniffiForeignFutureStructVoid;
 
 #endif
 #ifndef UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
 #define UNIFFI_FFIDEF_FOREIGN_FUTURE_COMPLETE_VOID
-typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureResultVoid
+typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStructVoid
     );
 
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_CLONE_MATRIXCRYPTO
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_CLONE_MATRIXCRYPTO
-uint64_t uniffi_matrix_crypto_core_fn_clone_matrixcrypto(uint64_t handle, RustCallStatus *_Nonnull out_status
+void*_Nonnull uniffi_matrix_crypto_core_fn_clone_matrixcrypto(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_FREE_MATRIXCRYPTO
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_FREE_MATRIXCRYPTO
-void uniffi_matrix_crypto_core_fn_free_matrixcrypto(uint64_t handle, RustCallStatus *_Nonnull out_status
+void uniffi_matrix_crypto_core_fn_free_matrixcrypto(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_CONSTRUCTOR_MATRIXCRYPTO_NEW
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_CONSTRUCTOR_MATRIXCRYPTO_NEW
-uint64_t uniffi_matrix_crypto_core_fn_constructor_matrixcrypto_new(RustBuffer user_id, RustBuffer device_id, RustBuffer pickle_key, RustCallStatus *_Nonnull out_status
+void*_Nonnull uniffi_matrix_crypto_core_fn_constructor_matrixcrypto_new(RustBuffer user_id, RustBuffer device_id, RustBuffer pickle_key, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_ADD_DEVICE
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_ADD_DEVICE
-void uniffi_matrix_crypto_core_fn_method_matrixcrypto_add_device(uint64_t ptr, RustBuffer device, RustCallStatus *_Nonnull out_status
+void uniffi_matrix_crypto_core_fn_method_matrixcrypto_add_device(void*_Nonnull ptr, RustBuffer device, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_CANCEL_VERIFICATION
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_CANCEL_VERIFICATION
-void uniffi_matrix_crypto_core_fn_method_matrixcrypto_cancel_verification(uint64_t ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
+void uniffi_matrix_crypto_core_fn_method_matrixcrypto_cancel_verification(void*_Nonnull ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_COMPLETE_VERIFICATION
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_COMPLETE_VERIFICATION
-void uniffi_matrix_crypto_core_fn_method_matrixcrypto_complete_verification(uint64_t ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
+void uniffi_matrix_crypto_core_fn_method_matrixcrypto_complete_verification(void*_Nonnull ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_CONFIRM_SAS
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_CONFIRM_SAS
-void uniffi_matrix_crypto_core_fn_method_matrixcrypto_confirm_sas(uint64_t ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
+void uniffi_matrix_crypto_core_fn_method_matrixcrypto_confirm_sas(void*_Nonnull ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_DECRYPT_EVENT
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_DECRYPT_EVENT
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_decrypt_event(uint64_t ptr, RustBuffer room_id, RustBuffer encrypted_content, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_decrypt_event(void*_Nonnull ptr, RustBuffer room_id, RustBuffer encrypted_content, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_DEVICE_FINGERPRINT
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_DEVICE_FINGERPRINT
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_fingerprint(uint64_t ptr, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_fingerprint(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_DEVICE_ID
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_DEVICE_ID
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_id(uint64_t ptr, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_device_id(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_ENABLE_ROOM_ENCRYPTION
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_ENABLE_ROOM_ENCRYPTION
-void uniffi_matrix_crypto_core_fn_method_matrixcrypto_enable_room_encryption(uint64_t ptr, RustBuffer room_id, RustBuffer algorithm, RustCallStatus *_Nonnull out_status
+void uniffi_matrix_crypto_core_fn_method_matrixcrypto_enable_room_encryption(void*_Nonnull ptr, RustBuffer room_id, RustBuffer algorithm, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_ENCRYPT_EVENT
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_ENCRYPT_EVENT
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_encrypt_event(uint64_t ptr, RustBuffer room_id, RustBuffer event_type, RustBuffer content, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_encrypt_event(void*_Nonnull ptr, RustBuffer room_id, RustBuffer event_type, RustBuffer content, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_ROOM_ENCRYPTION_STATE
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_ROOM_ENCRYPTION_STATE
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_room_encryption_state(uint64_t ptr, RustBuffer room_id, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_room_encryption_state(void*_Nonnull ptr, RustBuffer room_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_SAS_EMOJIS
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_SAS_EMOJIS
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_sas_emojis(uint64_t ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_sas_emojis(void*_Nonnull ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_USER_DEVICES
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_USER_DEVICES
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_user_devices(uint64_t ptr, RustBuffer user_id, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_user_devices(void*_Nonnull ptr, RustBuffer user_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_VERIFICATION_STATE
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_GET_VERIFICATION_STATE
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_verification_state(uint64_t ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_verification_state(void*_Nonnull ptr, RustBuffer verification_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_START_VERIFICATION
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_START_VERIFICATION
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_start_verification(uint64_t ptr, RustBuffer other_user_id, RustBuffer other_device_id, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_start_verification(void*_Nonnull ptr, RustBuffer other_user_id, RustBuffer other_device_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_USER_ID
 #define UNIFFI_FFIDEF_UNIFFI_MATRIX_CRYPTO_CORE_FN_METHOD_MATRIXCRYPTO_USER_ID
-RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_user_id(uint64_t ptr, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_matrix_crypto_core_fn_method_matrixcrypto_user_id(void*_Nonnull ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUSTBUFFER_ALLOC
@@ -551,6 +559,26 @@ void ffi_matrix_crypto_core_rust_future_free_f64(uint64_t handle
 #ifndef UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_COMPLETE_F64
 #define UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_COMPLETE_F64
 double ffi_matrix_crypto_core_rust_future_complete_f64(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_POLL_POINTER
+#define UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_POLL_POINTER
+void ffi_matrix_crypto_core_rust_future_poll_pointer(uint64_t handle, UniffiRustFutureContinuationCallback _Nonnull callback, uint64_t callback_data
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_CANCEL_POINTER
+#define UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_CANCEL_POINTER
+void ffi_matrix_crypto_core_rust_future_cancel_pointer(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_FREE_POINTER
+#define UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_FREE_POINTER
+void ffi_matrix_crypto_core_rust_future_free_pointer(uint64_t handle
+);
+#endif
+#ifndef UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_COMPLETE_POINTER
+#define UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_COMPLETE_POINTER
+void*_Nonnull ffi_matrix_crypto_core_rust_future_complete_pointer(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_MATRIX_CRYPTO_CORE_RUST_FUTURE_POLL_RUST_BUFFER

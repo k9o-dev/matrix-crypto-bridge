@@ -335,21 +335,43 @@ jobs:
           echo "Distribution extracted:"
           find dist-extracted -type f -exec ls -lh {} \;
 
-      - name: Inject iOS static library into npm package
+      - name: Inject iOS static library and Swift bindings into npm package
         run: |
-          # The compiled Rust static library must ship inside the npm package so that
-          # react-native-matrix-crypto.podspec can reference it via vendored_libraries.
-          # Without this step NativeModules.RNMatrixCrypto is undefined at runtime.
+          mkdir -p react-native-matrix-crypto/ios
+
+          # 1. Static library — required so vendored_libraries in the podspec works.
           LIB="dist-extracted/ios/libmatrix_crypto_ios.a"
           if [ ! -f "$LIB" ]; then
             echo "ERROR: $LIB not found in distribution archive."
             echo "The iOS build job must have failed. Aborting npm publish."
             exit 1
           fi
-          mkdir -p react-native-matrix-crypto/ios
           cp "$LIB" react-native-matrix-crypto/ios/libmatrix_crypto_ios.a
-          echo "Injected iOS library:"
-          ls -lh react-native-matrix-crypto/ios/libmatrix_crypto_ios.a
+          echo "✓ Injected libmatrix_crypto_ios.a ($(du -h $LIB | cut -f1))"
+
+          # 2. Swift bindings — MUST come from the same CI build as the .a.
+          #    Using stale committed bindings causes a UniFFI contract version mismatch
+          #    (different bindings_contract_version) which crashes with SIGILL at startup
+          #    inside uniffiEnsureMatrixCryptoCoreInitialized().
+          #    The build script copies freshly-generated bindings to dist/swift/ which
+          #    ends up in the archive as dist-extracted/swift/.
+          SWIFT_DIR="dist-extracted/swift"
+          for f in matrix_crypto.swift matrix_cryptoFFI.h matrix_cryptoFFI.modulemap; do
+            src="$SWIFT_DIR/$f"
+            if [ -f "$src" ]; then
+              cp "$src" react-native-matrix-crypto/ios/$f
+              echo "✓ Injected CI-generated $f"
+            else
+              echo "ERROR: $src not found — stale committed bindings would cause SIGILL crash."
+              echo "Ensure the build-ios job ran generate_swift_bindings() successfully."
+              exit 1
+            fi
+          done
+
+          # Show final contract version that will ship
+          echo ""
+          echo "UniFFI contract version in package:"
+          grep "bindings_contract_version" react-native-matrix-crypto/ios/matrix_crypto.swift | head -1
 
       - name: Install dependencies
         run: cd react-native-matrix-crypto && npm install
@@ -358,10 +380,12 @@ jobs:
         run: |
           echo "npm package ios/ contents:"
           ls -lh react-native-matrix-crypto/ios/
-          echo "Confirming libmatrix_crypto_ios.a is present:"
           test -f react-native-matrix-crypto/ios/libmatrix_crypto_ios.a \
             && echo "✓ libmatrix_crypto_ios.a present" \
-            || (echo "✗ libmatrix_crypto_ios.a MISSING — aborting" && exit 1)
+            || (echo "✗ libmatrix_crypto_ios.a MISSING" && exit 1)
+          test -f react-native-matrix-crypto/ios/matrix_crypto.swift \
+            && echo "✓ matrix_crypto.swift present" \
+            || (echo "✗ matrix_crypto.swift MISSING" && exit 1)
 
       - name: Publish to NPM
         run: |
