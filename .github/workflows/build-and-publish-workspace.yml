@@ -279,10 +279,11 @@ jobs:
           SHA256=$(cat matrix-crypto-bridge-dist.tar.gz.sha256 | awk '{print $1}')
           echo "Archive SHA256: $SHA256"
 
-          # Replace placeholder in BOTH podspecs
+          # Replace placeholder in MatrixCryptoBridge.podspec only
+          # (react-native-matrix-crypto.podspec uses :git dependency and doesn't need SHA256)
+          # sed -i "s/PLACEHOLDER_SHA256/$SHA256/" react-native-matrix-crypto/react-native-matrix-crypto.podspec
           sed -i "s/PLACEHOLDER_SHA256/$SHA256/" MatrixCryptoBridge.podspec
-          sed -i "s/PLACEHOLDER_SHA256/$SHA256/" react-native-matrix-crypto/react-native-matrix-crypto.podspec
-          echo "Updated podspecs with SHA256: $SHA256"
+          echo "Updated MatrixCryptoBridge.podspec with SHA256: $SHA256"
 
           # Install CocoaPods
           gem install --user-install cocoapods
