@@ -1,6 +1,6 @@
 {
   "name": "@k9o/react-native-matrix-crypto",
-  "version": "1.2.15",
+  "version": "1.2.16",
   "description": "Native Rust crypto bridge for React Native Matrix client with End-to-End Encryption support",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
