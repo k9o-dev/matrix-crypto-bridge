@@ -8,7 +8,7 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Initialization
 
-    @objc(initialize:deviceId:pickleKey:withResolver:withRejecter:)
+    @objc(initialize:deviceId:pickleKey:resolve:reject:)
     func initialize(
         userId: String,
         deviceId: String,
@@ -30,7 +30,7 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Device Information
 
-    @objc(getDeviceFingerprint:withRejecter:)
+    @objc(getDeviceFingerprint:reject:)
     func getDeviceFingerprint(
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
@@ -42,7 +42,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getUserId:withRejecter:)
+    @objc(getUserId:reject:)
     func getUserId(
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
@@ -54,7 +54,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getDeviceId:withRejecter:)
+    @objc(getDeviceId:reject:)
     func getDeviceId(
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock
@@ -68,7 +68,7 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Device Management
 
-    @objc(getUserDevices:withResolver:withRejecter:)
+    @objc(getUserDevices:resolve:reject:)
     func getUserDevices(
         userId: String,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -81,7 +81,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(addDevice:withResolver:withRejecter:)
+    @objc(addDevice:resolve:reject:)
     func addDevice(
         device: [String: Any],
         resolve: @escaping RCTPromiseResolveBlock,
@@ -97,7 +97,7 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Device Verification
 
-    @objc(startVerification:otherDeviceId:withResolver:withRejecter:)
+    @objc(startVerification:otherDeviceId:resolve:reject:)
     func startVerification(
         otherUserId: String,
         otherDeviceId: String,
@@ -114,7 +114,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getSASEmojis:withResolver:withRejecter:)
+    @objc(getSASEmojis:resolve:reject:)
     func getSASEmojis(
         verificationId: String,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -128,7 +128,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(confirmSAS:withResolver:withRejecter:)
+    @objc(confirmSAS:resolve:reject:)
     func confirmSAS(
         verificationId: String,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -143,7 +143,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(completeVerification:withResolver:withRejecter:)
+    @objc(completeVerification:resolve:reject:)
     func completeVerification(
         verificationId: String,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -157,7 +157,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(cancelVerification:withResolver:withRejecter:)
+    @objc(cancelVerification:resolve:reject:)
     func cancelVerification(
         verificationId: String,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -171,7 +171,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getVerificationState:withResolver:withRejecter:)
+    @objc(getVerificationState:resolve:reject:)
     func getVerificationState(
         verificationId: String,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -186,7 +186,7 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Room Encryption
 
-    @objc(enableRoomEncryption:algorithm:withResolver:withRejecter:)
+    @objc(enableRoomEncryption:algorithm:resolve:reject:)
     func enableRoomEncryption(
         roomId: String,
         algorithm: String,
@@ -201,7 +201,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getRoomEncryptionState:withResolver:withRejecter:)
+    @objc(getRoomEncryptionState:resolve:reject:)
     func getRoomEncryptionState(
         roomId: String,
         resolve: @escaping RCTPromiseResolveBlock,
@@ -216,7 +216,7 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Event Encryption/Decryption
 
-    @objc(encryptEvent:eventType:content:withResolver:withRejecter:)
+    @objc(encryptEvent:eventType:content:resolve:reject:)
     func encryptEvent(
         roomId: String,
         eventType: String,
@@ -235,7 +235,7 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(decryptEvent:encryptedContent:withResolver:withRejecter:)
+    @objc(decryptEvent:encryptedContent:resolve:reject:)
     func decryptEvent(
         roomId: String,
         encryptedContent: String,
@@ -254,7 +254,7 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Cleanup
 
-    @objc(destroy:withRejecter:)
+    @objc(destroy:reject:)
     func destroy(
         resolve: @escaping RCTPromiseResolveBlock,
         reject: @escaping RCTPromiseRejectBlock

@@ -20,13 +20,15 @@ Pod::Spec.new do |s|
   # pod is required. This makes the package fully self-contained.
   s.vendored_libraries = "ios/libmatrix_crypto_ios.a"
 
-  # UniFFI-generated Swift bindings + React Native bridge files
+  # UniFFI-generated Swift bindings + React Native bridge files.
+  # RNMatrixCryptoTurboModule.mm adds RCTTurboModule conformance (New Architecture).
   s.source_files = [
     "ios/matrix_crypto.swift",
     "ios/matrix_cryptoFFI.h",
     "ios/MatrixCryptoBridge.swift",
     "ios/RNMatrixCryptoModule.swift",
-    "ios/RNMatrixCrypto.m"
+    "ios/RNMatrixCrypto.m",
+    "ios/RNMatrixCryptoTurboModule.mm"
   ]
 
   s.public_header_files = "ios/matrix_cryptoFFI.h"
