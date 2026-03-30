@@ -1,6 +1,6 @@
 {
   "name": "@k9o/react-native-matrix-crypto",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Native Rust crypto bridge for React Native Matrix client with End-to-End Encryption support",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -70,5 +70,13 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
+  },
+  "codegenConfig": {
+    "name": "RNMatrixCryptoSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.k9o.matrixcrypto"
+    }
   }
 }
