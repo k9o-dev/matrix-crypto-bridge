@@ -172,6 +172,19 @@ jobs:
           echo "Distribution contents:"
           find dist -type f -exec ls -lh {} \;
 
+      - name: Copy Swift bindings into dist archive
+        run: |
+          # Copy pre-committed UniFFI-generated Swift bindings from the repo into the dist archive.
+          # These files are committed to react-native-matrix-crypto/ios/ and must be present in
+          # the dist archive at ios/bindings/ so the MatrixCryptoBridge CocoaPods podspec can
+          # reference them via source_files, public_header_files, and module_map.
+          mkdir -p dist/ios/bindings
+          cp react-native-matrix-crypto/ios/matrix_crypto.swift dist/ios/bindings/
+          cp react-native-matrix-crypto/ios/matrix_cryptoFFI.h dist/ios/bindings/
+          cp react-native-matrix-crypto/ios/matrix_cryptoFFI.modulemap dist/ios/bindings/
+          echo "Swift bindings copied to dist/ios/bindings/:"
+          ls -lh dist/ios/bindings/
+
       - name: Create distribution archive
         run: |
           # Copy LICENSE to dist directory for CocoaPods
