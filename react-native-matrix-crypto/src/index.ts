@@ -6,8 +6,8 @@ const LINKING_ERROR =
   '- You rebuilt the app after installing the package\n' +
   '- You are not using Expo Go\n';
 
-const MatrixCryptoModule = NativeModules.MatrixCrypto
-  ? NativeModules.MatrixCrypto
+const MatrixCryptoModule = NativeModules.RNMatrixCrypto
+  ? NativeModules.RNMatrixCrypto
   : new Proxy(
       {},
       {
