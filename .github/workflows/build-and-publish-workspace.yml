@@ -35,7 +35,10 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,x86_64-apple-ios
+          # aarch64-apple-ios       = physical device (arm64)
+          # aarch64-apple-ios-sim   = Apple Silicon Mac simulator (arm64)
+          # x86_64-apple-ios        = Intel Mac simulator (x86_64)
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
@@ -251,7 +254,8 @@ jobs:
             Pre-built native libraries for iOS and Android platforms.
 
             ## Contents
-            - iOS static libraries (aarch64 device + x86_64 simulator)
+            - iOS static library bundled in the npm package (`libmatrix_crypto_ios.a`)
+              - Slices: aarch64 device, aarch64 Apple Silicon simulator, x86_64 Intel simulator
             - Android shared libraries (aarch64, armv7, x86_64)
             - Swift bindings for iOS
             - Kotlin bindings for Android
@@ -259,7 +263,11 @@ jobs:
             ## Installation
             ```bash
             npm install @k9o/react-native-matrix-crypto@latest
+            cd ios && pod install
             ```
+
+            No separate CocoaPods pod is required. The compiled library ships
+            inside the npm package and is linked automatically via `vendored_libraries`.
 
             ## Verification
             ```bash
@@ -327,13 +335,33 @@ jobs:
           echo "Distribution extracted:"
           find dist-extracted -type f -exec ls -lh {} \;
 
+      - name: Inject iOS static library into npm package
+        run: |
+          # The compiled Rust static library must ship inside the npm package so that
+          # react-native-matrix-crypto.podspec can reference it via vendored_libraries.
+          # Without this step NativeModules.RNMatrixCrypto is undefined at runtime.
+          LIB="dist-extracted/ios/libmatrix_crypto_ios.a"
+          if [ ! -f "$LIB" ]; then
+            echo "ERROR: $LIB not found in distribution archive."
+            echo "The iOS build job must have failed. Aborting npm publish."
+            exit 1
+          fi
+          mkdir -p react-native-matrix-crypto/ios
+          cp "$LIB" react-native-matrix-crypto/ios/libmatrix_crypto_ios.a
+          echo "Injected iOS library:"
+          ls -lh react-native-matrix-crypto/ios/libmatrix_crypto_ios.a
+
       - name: Install dependencies
         run: cd react-native-matrix-crypto && npm install
 
       - name: Verify package contents
         run: |
-          echo "Package contents:"
-          ls -la react-native-matrix-crypto/
+          echo "npm package ios/ contents:"
+          ls -lh react-native-matrix-crypto/ios/
+          echo "Confirming libmatrix_crypto_ios.a is present:"
+          test -f react-native-matrix-crypto/ios/libmatrix_crypto_ios.a \
+            && echo "✓ libmatrix_crypto_ios.a present" \
+            || (echo "✗ libmatrix_crypto_ios.a MISSING — aborting" && exit 1)
 
       - name: Publish to NPM
         run: |

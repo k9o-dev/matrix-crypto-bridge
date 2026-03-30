@@ -66,23 +66,29 @@ verify_artifact() {
 # Function to build iOS libraries
 build_ios() {
     print_section "Building iOS Libraries"
-    
-    local ios_targets=("aarch64-apple-ios" "x86_64-apple-ios")
+
+    # Three targets for full platform coverage:
+    #   aarch64-apple-ios       = physical device (arm64)
+    #   aarch64-apple-ios-sim   = Apple Silicon Mac simulator (arm64)
+    #   x86_64-apple-ios        = Intel Mac simulator (x86_64)
+    local device_targets=("aarch64-apple-ios")
+    local simulator_targets=("aarch64-apple-ios-sim" "x86_64-apple-ios")
     local ios_output_dir="$DIST_DIR/ios"
     mkdir -p "$ios_output_dir"
-    
-    for target in "${ios_targets[@]}"; do
+
+    # Build all targets
+    local all_targets=("${device_targets[@]}" "${simulator_targets[@]}")
+    for target in "${all_targets[@]}"; do
         print_subsection "Building for $target..."
-        
+
         cd "$PROJECT_ROOT"
         if cargo build -p matrix-crypto-ios --target "$target" --release; then
             print_success "Build succeeded for $target"
-            
-            # Copy the static library
+
             local lib_file="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_ios.a"
             if verify_artifact "$lib_file" "iOS static library ($target)"; then
-                cp "$lib_file" "$ios_output_dir/libmatrix_crypto_ios_$target.a"
-                print_success "Copied to $ios_output_dir/libmatrix_crypto_ios_$target.a"
+                cp "$lib_file" "$ios_output_dir/libmatrix_crypto_ios_${target}.a"
+                print_success "Copied to $ios_output_dir/libmatrix_crypto_ios_${target}.a"
             else
                 print_error "Failed to find library for $target"
                 return 1
@@ -92,35 +98,59 @@ build_ios() {
             return 1
         fi
     done
-    
-    # Create universal binary (lipo)
+
     if command_exists lipo; then
-        print_subsection "Creating universal binary..."
+        # --- Simulator fat binary: arm64 (Apple Silicon) + x86_64 (Intel) ---
+        local sim_lib="$ios_output_dir/libmatrix_crypto_ios_simulator.a"
+        lipo -create \
+            "$ios_output_dir/libmatrix_crypto_ios_aarch64-apple-ios-sim.a" \
+            "$ios_output_dir/libmatrix_crypto_ios_x86_64-apple-ios.a" \
+            -output "$sim_lib"
+        verify_artifact "$sim_lib" "Simulator fat binary (arm64 + x86_64)"
+
+        # --- XCFramework (preferred): bundles device + simulator properly ---
+        if command_exists xcodebuild; then
+            print_subsection "Creating MatrixCrypto.xcframework..."
+            local xcfw_dir="$ios_output_dir/MatrixCrypto.xcframework"
+            rm -rf "$xcfw_dir"
+            xcodebuild -create-xcframework \
+                -library "$ios_output_dir/libmatrix_crypto_ios_aarch64-apple-ios.a" \
+                -library "$sim_lib" \
+                -output "$xcfw_dir"
+
+            if [ -d "$xcfw_dir" ]; then
+                print_success "Created MatrixCrypto.xcframework"
+            else
+                print_warning "xcodebuild -create-xcframework failed"
+            fi
+        fi
+
+        # --- Fat binary fallback (device arm64 + Intel simulator x86_64) ---
+        # Used by CocoaPods vendored_libraries. Does NOT include Apple Silicon
+        # simulator — developers on M-series Macs must build from device target
+        # or use the XCFramework directly.
         local universal_lib="$ios_output_dir/libmatrix_crypto_ios.a"
         lipo -create \
             "$ios_output_dir/libmatrix_crypto_ios_aarch64-apple-ios.a" \
             "$ios_output_dir/libmatrix_crypto_ios_x86_64-apple-ios.a" \
             -output "$universal_lib"
-        
-        if verify_artifact "$universal_lib" "Universal iOS library"; then
-            print_success "Created universal binary"
-        else
-            print_warning "Failed to create universal binary"
-        fi
+        verify_artifact "$universal_lib" "Fat binary (device arm64 + Intel x86_64 simulator)"
     else
-        print_warning "lipo not found - skipping universal binary creation (requires macOS)"
+        print_warning "lipo not found — skipping binary creation (requires macOS)"
     fi
-    
-    # Also copy to react-native package for convenience
-    print_subsection "Copying to react-native-matrix-crypto package..."
-    mkdir -p "$PACKAGE_DIR/ios/prebuilt"
-    cp "$ios_output_dir/libmatrix_crypto_ios_aarch64-apple-ios.a" "$PACKAGE_DIR/ios/prebuilt/libmatrix_crypto_core_arm64.a"
-    cp "$ios_output_dir/libmatrix_crypto_ios_x86_64-apple-ios.a" "$PACKAGE_DIR/ios/prebuilt/libmatrix_crypto_core_sim.a"
+
+    # Copy the fat binary into the npm package ios/ directory so it is included
+    # in the published tarball. The podspec references it via vendored_libraries.
+    print_subsection "Copying libmatrix_crypto_ios.a to npm package ios/..."
+    mkdir -p "$PACKAGE_DIR/ios"
     if [ -f "$ios_output_dir/libmatrix_crypto_ios.a" ]; then
-        cp "$ios_output_dir/libmatrix_crypto_ios.a" "$PACKAGE_DIR/ios/prebuilt/libmatrix_crypto_ios.a"
+        cp "$ios_output_dir/libmatrix_crypto_ios.a" "$PACKAGE_DIR/ios/libmatrix_crypto_ios.a"
+        print_success "Copied libmatrix_crypto_ios.a to $PACKAGE_DIR/ios/"
+    else
+        print_error "libmatrix_crypto_ios.a not found — npm package will be broken"
+        return 1
     fi
-    print_success "Copied to react-native package"
-    
+
     return 0
 }
 
