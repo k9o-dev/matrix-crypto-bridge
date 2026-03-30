@@ -86,12 +86,12 @@ class RNMatrixCrypto: NSObject {
             let devices = try crypto.getUserDevices(userId: userId)
             let deviceDicts = devices.map { device -> [String: Any] in
                 [
-                    "deviceId": device.device_id,
-                    "userId": device.user_id,
-                    "displayName": device.display_name ?? NSNull(),
+                    "deviceId": device.deviceId,
+                    "userId": device.userId,
+                    "displayName": device.displayName as Any,
                     "fingerprint": device.fingerprint,
-                    "isVerified": device.is_verified,
-                    "isBlocked": device.is_blocked,
+                    "isVerified": device.isVerified,
+                    "isBlocked": device.isBlocked,
                     "algorithm": device.algorithm
                 ]
             }
@@ -114,12 +114,12 @@ class RNMatrixCrypto: NSObject {
         
         do {
             let deviceInfo = DeviceInfo(
-                device_id: device["deviceId"] as? String ?? "",
-                user_id: device["userId"] as? String ?? "",
-                display_name: device["displayName"] as? String,
+                deviceId: device["deviceId"] as? String ?? "",
+                userId: device["userId"] as? String ?? "",
+                displayName: device["displayName"] as? String,
                 fingerprint: device["fingerprint"] as? String ?? "",
-                is_verified: device["isVerified"] as? Bool ?? false,
-                is_blocked: device["isBlocked"] as? Bool ?? false,
+                isVerified: device["isVerified"] as? Bool ?? false,
+                isBlocked: device["isBlocked"] as? Bool ?? false,
                 algorithm: device["algorithm"] as? String ?? ""
             )
             try crypto.addDevice(deviceInfo)
@@ -149,10 +149,10 @@ class RNMatrixCrypto: NSObject {
                 otherDeviceId: otherDeviceId
             )
             resolve([
-                "verificationId": state.verification_id,
+                "verificationId": state.verificationId,
                 "state": state.state,
-                "otherUserId": state.other_user_id,
-                "otherDeviceId": state.other_device_id,
+                "otherUserId": state.otherUserId,
+                "otherDeviceId": state.otherDeviceId,
                 "emojis": [],
                 "decimals": []
             ])
@@ -257,10 +257,10 @@ class RNMatrixCrypto: NSObject {
         do {
             let state = try crypto.getVerificationState(verificationId: verificationId)
             resolve([
-                "verificationId": state.verification_id,
+                "verificationId": state.verificationId,
                 "state": state.state,
-                "otherUserId": state.other_user_id,
-                "otherDeviceId": state.other_device_id,
+                "otherUserId": state.otherUserId,
+                "otherDeviceId": state.otherDeviceId,
                 "emojis": state.emojis.map { ["emoji": $0.emoji, "name": $0.name] },
                 "decimals": state.decimals
             ])
@@ -305,11 +305,11 @@ class RNMatrixCrypto: NSObject {
         do {
             let state = try crypto.getRoomEncryptionState(roomId: roomId)
             resolve([
-                "roomId": state.room_id,
-                "isEncrypted": state.is_encrypted,
-                "algorithm": state.algorithm ?? NSNull(),
-                "trustedDevices": state.trusted_devices,
-                "untrustedDevices": state.untrusted_devices
+                "roomId": state.roomId,
+                "isEncrypted": state.isEncrypted,
+                "algorithm": state.algorithm as Any,
+                "trustedDevices": state.trustedDevices,
+                "untrustedDevices": state.untrustedDevices
             ])
         } catch {
             reject("GET_ENCRYPTION_STATE_ERROR", "Failed to get room encryption state: \(error.localizedDescription)", error)
