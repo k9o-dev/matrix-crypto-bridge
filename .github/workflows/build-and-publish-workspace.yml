@@ -172,18 +172,26 @@ jobs:
           echo "Distribution contents:"
           find dist -type f -exec ls -lh {} \;
 
-      - name: Copy Swift bindings into dist archive
+      - name: Copy Swift bindings and bridge files into dist archive
         run: |
-          # Copy pre-committed UniFFI-generated Swift bindings from the repo into the dist archive.
-          # These files are committed to react-native-matrix-crypto/ios/ and must be present in
-          # the dist archive at ios/bindings/ so the MatrixCryptoBridge CocoaPods podspec can
-          # reference them via source_files, public_header_files, and module_map.
+          # 1. UniFFI-generated Swift bindings -> ios/bindings/
           mkdir -p dist/ios/bindings
           cp react-native-matrix-crypto/ios/matrix_crypto.swift dist/ios/bindings/
           cp react-native-matrix-crypto/ios/matrix_cryptoFFI.h dist/ios/bindings/
           cp react-native-matrix-crypto/ios/matrix_cryptoFFI.modulemap dist/ios/bindings/
           echo "Swift bindings copied to dist/ios/bindings/:"
           ls -lh dist/ios/bindings/
+
+          # 2. React Native bridge files -> ios/bridge/
+          # These are the files that register RNMatrixCrypto with React Native's NativeModules.
+          # Without them in the archive the podspec cannot compile the native module and
+          # NativeModules.RNMatrixCrypto will be undefined at runtime.
+          mkdir -p dist/ios/bridge
+          cp react-native-matrix-crypto/ios/MatrixCryptoBridge.swift dist/ios/bridge/
+          cp react-native-matrix-crypto/ios/RNMatrixCryptoModule.swift dist/ios/bridge/
+          cp react-native-matrix-crypto/ios/RNMatrixCrypto.m dist/ios/bridge/
+          echo "Bridge files copied to dist/ios/bridge/:"
+          ls -lh dist/ios/bridge/
 
       - name: Create distribution archive
         run: |
