@@ -49,3 +49,6 @@ matrix-crypto-android/generated/
 *.m
 *.rlib
 
+# Allow Objective-C bridge files in React Native packages
+!react-native-matrix-crypto/ios/*.m
+
