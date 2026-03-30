@@ -29,8 +29,9 @@ Pod::Spec.new do |s|
   # Dependencies
   s.dependency "React-Core"
   # MatrixCryptoBridge provides the pre-built Rust static library (libmatrix_crypto_ios.a)
-  # and the UniFFI-generated Swift bindings
-  s.dependency "MatrixCryptoBridge", "~> #{s.version}"
+  # and the UniFFI-generated Swift bindings. Reference it directly from GitHub since
+  # it may not be published to CocoaPods trunk yet.
+  s.dependency "MatrixCryptoBridge", :git => "https://github.com/k9o-dev/matrix-crypto-bridge.git", :tag => "v#{s.version}"
 
   s.pod_target_xcconfig = {
     "OTHER_LDFLAGS"  => "-lc++ -lresolv",
