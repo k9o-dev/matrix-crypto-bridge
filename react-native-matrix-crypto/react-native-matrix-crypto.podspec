@@ -13,10 +13,9 @@ Pod::Spec.new do |s|
   s.swift_version = "5.9"
 
   # Source files are included directly in the npm package at ios/
-  # (not downloaded from GitHub Releases like the CocoaPods-only MatrixCryptoBridge pod)
   s.source = { :git => package["repository"]["url"], :tag => "#{s.version}" }
 
-  # All Swift + ObjC source files needed to compile the React Native module
+  # React Native bridge files (Swift + ObjC) that wrap the Rust crypto library
   s.source_files = [
     "ios/matrix_crypto.swift",
     "ios/matrix_cryptoFFI.h",
@@ -27,7 +26,11 @@ Pod::Spec.new do |s|
 
   s.public_header_files = "ios/matrix_cryptoFFI.h"
 
+  # Dependencies
   s.dependency "React-Core"
+  # MatrixCryptoBridge provides the pre-built Rust static library (libmatrix_crypto_ios.a)
+  # and the UniFFI-generated Swift bindings
+  s.dependency "MatrixCryptoBridge", "~> #{s.version}"
 
   s.pod_target_xcconfig = {
     "OTHER_LDFLAGS"  => "-lc++ -lresolv",
