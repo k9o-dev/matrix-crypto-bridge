@@ -27,7 +27,7 @@ Pod::Spec.new do |s|
   #   ios/libmatrix_crypto_ios.a               <- universal static library
   #   ios/bindings/matrix_crypto.swift         <- UniFFI-generated Swift bindings
   #   ios/bindings/matrix_cryptoFFI.h          <- UniFFI-generated C header
-  #   ios/bindings/matrix_cryptoFFI.modulemap  <- module map
+  #   ios/bindings/matrix_cryptoFFI.modulemap  <- module map (not used due to CocoaPods limitation)
   #   ios/bridge/MatrixCryptoBridge.swift      <- Swift singleton wrapper
   #   ios/bridge/RNMatrixCryptoModule.swift    <- React Native module implementation
   #   ios/bridge/RNMatrixCrypto.m              <- ObjC RCT_EXTERN_MODULE registration
@@ -56,15 +56,11 @@ Pod::Spec.new do |s|
   # C header for the Rust FFI symbols
   s.public_header_files = "ios/bindings/matrix_cryptoFFI.h"
 
-  # Module map that exposes the C FFI symbols as the `matrix_cryptoFFI` Swift module
-  s.module_map = "ios/bindings/matrix_cryptoFFI.modulemap"
-
   s.dependency "React-Core"
 
   # Linker flags needed to resolve Rust runtime symbols in the static library
   s.pod_target_xcconfig = {
-    "OTHER_LDFLAGS"       => "-lc++ -lresolv",
-    "SWIFT_INCLUDE_PATHS" => "$(PODS_TARGET_SRCROOT)/ios/bindings",
-    "DEFINES_MODULE"      => "YES"
+    "OTHER_LDFLAGS"  => "-lc++ -lresolv",
+    "DEFINES_MODULE" => "YES"
   }
 end

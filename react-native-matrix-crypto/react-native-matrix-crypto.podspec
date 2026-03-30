@@ -26,7 +26,6 @@ Pod::Spec.new do |s|
   ]
 
   s.public_header_files = "ios/matrix_cryptoFFI.h"
-  s.module_map = "ios/matrix_cryptoFFI.modulemap"
 
   s.dependency "React-Core"
 
