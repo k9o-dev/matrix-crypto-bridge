@@ -295,9 +295,16 @@ generate_swift_bindings() {
         if [ -f "$swift_output_dir/matrix_crypto.swift" ]; then
             print_success "Generated Swift bindings"
             
-            # Copy to package
+            # Copy Swift bindings + C header + module map to package ios/bindings
+            # These three files are all required for CocoaPods to link the Rust static library
             mkdir -p "$PACKAGE_DIR/ios/bindings"
             cp "$swift_output_dir/matrix_crypto.swift" "$PACKAGE_DIR/ios/bindings/"
+            [ -f "$swift_output_dir/matrix_cryptoFFI.h" ] && \
+                cp "$swift_output_dir/matrix_cryptoFFI.h" "$PACKAGE_DIR/ios/bindings/" && \
+                print_success "Copied C header (matrix_cryptoFFI.h) to package"
+            [ -f "$swift_output_dir/matrix_cryptoFFI.modulemap" ] && \
+                cp "$swift_output_dir/matrix_cryptoFFI.modulemap" "$PACKAGE_DIR/ios/bindings/" && \
+                print_success "Copied module map (matrix_cryptoFFI.modulemap) to package"
             print_success "Copied Swift bindings to package"
         else
             print_warning "Swift bindings may not have been generated correctly"
