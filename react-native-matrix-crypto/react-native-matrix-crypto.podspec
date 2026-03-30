@@ -23,7 +23,7 @@ Pod::Spec.new do |s|
   #   ios/bridge/RNMatrixCrypto.m           <- Objective-C RCT_EXTERN_MODULE registration
   s.source = {
     :http => "https://github.com/k9o-dev/matrix-crypto-bridge/releases/download/v#{s.version}/matrix-crypto-bridge-dist.tar.gz",
-    :sha256 => "placeholder_sha256_will_be_updated_in_ci"
+    :sha256 => "cfec051bb2254ffb028cdf658d4639a25256733d12362719749c73b00dc2beec"
   }
 
   # Pre-built universal static library (Rust)
