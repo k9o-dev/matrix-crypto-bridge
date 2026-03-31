@@ -218,22 +218,22 @@ impl MatrixCrypto {
         // displayed. For real Megolm ciphertext from other clients this will fail
         // and we return a proper error instead of malformed JSON.
         let parsed: serde_json::Value = serde_json::from_str(&encrypted_content)
-            .map_err(|e| CryptoError::Generic(format!("Invalid event content: {e}")))?;
+            .map_err(|e| CryptoError::DecryptionFailed(format!("Invalid event content: {e}")))?;
 
         let ciphertext = parsed["ciphertext"]
             .as_str()
-            .ok_or_else(|| CryptoError::Generic("Missing ciphertext field".to_string()))?;
+            .ok_or_else(|| CryptoError::DecryptionFailed("Missing ciphertext field".to_string()))?;
 
         let decoded = STANDARD
             .decode(ciphertext)
-            .map_err(|_| CryptoError::Generic("Cannot decrypt: no session key for this event".to_string()))?;
+            .map_err(|_| CryptoError::DecryptionFailed("Cannot decrypt: no session key for this event".to_string()))?;
 
         let content_json = String::from_utf8(decoded)
-            .map_err(|_| CryptoError::Generic("Decrypted content is not valid UTF-8".to_string()))?;
+            .map_err(|_| CryptoError::DecryptionFailed("Decrypted content is not valid UTF-8".to_string()))?;
 
         // Verify content_json is valid JSON before embedding it
         serde_json::from_str::<serde_json::Value>(&content_json)
-            .map_err(|_| CryptoError::Generic("Decrypted content is not valid JSON".to_string()))?;
+            .map_err(|_| CryptoError::DecryptionFailed("Decrypted content is not valid JSON".to_string()))?;
 
         Ok(format!(r#"{{"type":"m.room.message","content":{content_json}}}"#))
     }
