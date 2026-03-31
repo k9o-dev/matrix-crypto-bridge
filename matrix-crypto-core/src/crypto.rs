@@ -213,11 +213,29 @@ impl MatrixCrypto {
         _room_id: String,
         encrypted_content: String,
     ) -> Result<String, CryptoError> {
-        // For now, just return a mock decrypted event
-        // In production, this would use the actual matrix-sdk-crypto
-        Ok(format!(
-            r#"{{"body":"Decrypted message","msgtype":"m.text","original":"{encrypted_content}"}}"#
-        ))
+        // Our mock encrypt_event stores the original content as a base64-encoded
+        // ciphertext. Try to round-trip it here so our own sent messages can be
+        // displayed. For real Megolm ciphertext from other clients this will fail
+        // and we return a proper error instead of malformed JSON.
+        let parsed: serde_json::Value = serde_json::from_str(&encrypted_content)
+            .map_err(|e| CryptoError::Generic(format!("Invalid event content: {e}")))?;
+
+        let ciphertext = parsed["ciphertext"]
+            .as_str()
+            .ok_or_else(|| CryptoError::Generic("Missing ciphertext field".to_string()))?;
+
+        let decoded = STANDARD
+            .decode(ciphertext)
+            .map_err(|_| CryptoError::Generic("Cannot decrypt: no session key for this event".to_string()))?;
+
+        let content_json = String::from_utf8(decoded)
+            .map_err(|_| CryptoError::Generic("Decrypted content is not valid UTF-8".to_string()))?;
+
+        // Verify content_json is valid JSON before embedding it
+        serde_json::from_str::<serde_json::Value>(&content_json)
+            .map_err(|_| CryptoError::Generic("Decrypted content is not valid JSON".to_string()))?;
+
+        Ok(format!(r#"{{"type":"m.room.message","content":{content_json}}}"#))
     }
 
     /// Generate a random device fingerprint
