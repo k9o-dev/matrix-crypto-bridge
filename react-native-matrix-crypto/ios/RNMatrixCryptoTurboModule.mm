@@ -25,6 +25,14 @@
 
 #import <Foundation/Foundation.h>
 
+// Expose the Swift-defined RNMatrixCrypto class to this ObjC++ translation
+// unit. CocoaPods generates this header for every mixed-language pod; the name
+// is the module name (pod name with dashes replaced by underscores) + "-Swift.h".
+// Without this import the compiler can't see the @interface for RNMatrixCrypto
+// and the category declarations below fail with
+//   "cannot find interface declaration for 'RNMatrixCrypto'"
+#import "react_native_matrix_crypto-Swift.h"
+
 // Resolve spec header — try Expo/RN 0.73+ path first, then bare RN CLI path.
 #if __has_include(<ReactCodegen/RNMatrixCryptoSpec/RNMatrixCryptoSpec.h>)
   #import <ReactCodegen/RNMatrixCryptoSpec/RNMatrixCryptoSpec.h>
