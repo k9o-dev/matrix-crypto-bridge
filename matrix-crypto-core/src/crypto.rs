@@ -579,10 +579,8 @@ impl MatrixCrypto {
         let to_sign = serde_json::to_string(&unsigned)
             .map_err(|e| CryptoError::Unknown(e.to_string()))?;
         let signature = account.sign(&to_sign);
-        let sig_value = serde_json::to_value(&signature)
-            .map_err(|e| CryptoError::Unknown(e.to_string()))?;
-        let sig_b64: String = serde_json::from_value(sig_value)
-            .map_err(|e| CryptoError::Unknown(e.to_string()))?;
+        // Ed25519Signature does not implement serde::Serialize — use to_base64() directly.
+        let sig_b64 = signature.to_base64();
 
         let device_keys = serde_json::json!({
             "algorithms": ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
@@ -618,16 +616,16 @@ impl MatrixCrypto {
         let otks = account.one_time_keys();
         let mut result: std::collections::BTreeMap<String, serde_json::Value> = std::collections::BTreeMap::new();
 
-        for (key_id, curve25519_key) in &otks {
+        // KeyId does not implement Display — use enumerate() for the key ID string.
+        // Any unique opaque string is valid for Matrix OTK key IDs.
+        for (idx, (_, curve25519_key)) in otks.iter().enumerate() {
             let key_b64 = curve25519_key.to_base64();
 
             // Canonical JSON for the key object (sorted single-key object)
             let to_sign = format!(r#"{{"key":"{}"}}"#, key_b64);
             let signature = account.sign(&to_sign);
-            let sig_value = serde_json::to_value(&signature)
-                .map_err(|e| CryptoError::Unknown(e.to_string()))?;
-            let sig_b64: String = serde_json::from_value(sig_value)
-                .map_err(|e| CryptoError::Unknown(e.to_string()))?;
+            // Ed25519Signature does not implement serde::Serialize — use to_base64() directly.
+            let sig_b64 = signature.to_base64();
 
             let signed_key = serde_json::json!({
                 "key": key_b64,
@@ -638,7 +636,9 @@ impl MatrixCrypto {
                 }
             });
 
-            result.insert(format!("signed_curve25519:{}", key_id), signed_key);
+            // Format key ID as a zero-padded counter (e.g. "signed_curve25519:0001").
+            // The exact format doesn't matter — the homeserver treats OTK IDs as opaque.
+            result.insert(format!("signed_curve25519:{:04}", idx + 1), signed_key);
         }
 
         serde_json::to_string(&result)
