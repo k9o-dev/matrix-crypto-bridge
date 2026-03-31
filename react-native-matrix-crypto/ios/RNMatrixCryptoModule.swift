@@ -300,6 +300,26 @@ class RNMatrixCrypto: NSObject {
         catch { reject("OLM_DECRYPT_ERROR", "Failed to Olm decrypt: \(error.localizedDescription)", error) }
     }
 
+    // MARK: - Key Upload (T1-1)
+
+    @objc(getDeviceKeysJson:reject:)
+    func getDeviceKeysJson(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { resolve(try MatrixCryptoBridge.getDeviceKeysJson()) }
+        catch { reject("GET_DEVICE_KEYS_ERROR", "Failed to get device keys: \(error.localizedDescription)", error) }
+    }
+
+    @objc(generateOneTimeKeysJson:resolve:reject:)
+    func generateOneTimeKeysJson(count: UInt32, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { resolve(try MatrixCryptoBridge.generateOneTimeKeysJson(count: count)) }
+        catch { reject("GEN_OTK_ERROR", "Failed to generate one-time keys: \(error.localizedDescription)", error) }
+    }
+
+    @objc(markKeysAsPublished:reject:)
+    func markKeysAsPublished(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { try MatrixCryptoBridge.markKeysAsPublished(); resolve(["success": true]) }
+        catch { reject("MARK_PUBLISHED_ERROR", "Failed to mark keys as published: \(error.localizedDescription)", error) }
+    }
+
     // MARK: - Cleanup
 
     @objc(destroy:reject:)

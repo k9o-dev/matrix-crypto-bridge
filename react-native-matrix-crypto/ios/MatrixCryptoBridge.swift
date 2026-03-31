@@ -194,6 +194,20 @@ import Foundation
         )
     }
 
+    // MARK: - Key Upload (T1-1: device keys + one-time keys)
+
+    @objc public static func getDeviceKeysJson() throws -> String {
+        return try requireInstance().getDeviceKeysJson()
+    }
+
+    @objc public static func generateOneTimeKeysJson(count: UInt32) throws -> String {
+        return try requireInstance().generateOneTimeKeysJson(count: count)
+    }
+
+    @objc public static func markKeysAsPublished() throws {
+        try requireInstance().markKeysAsPublished()
+    }
+
     // MARK: - Private Helpers
 
     private static func requireInstance() throws -> MatrixCrypto {

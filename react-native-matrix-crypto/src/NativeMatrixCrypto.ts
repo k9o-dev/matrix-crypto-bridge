@@ -60,6 +60,9 @@ export interface Spec extends TurboModule {
   createOlmSession(userId: string, deviceId: string, theirIdentityKey: string, theirOneTimeKey: string): Promise<Object>;
   olmEncrypt(userId: string, deviceId: string, plaintext: string): Promise<string>;
   olmDecrypt(senderIdentityKey: string, msgType: number, ciphertextB64: string): Promise<string>;
+  getDeviceKeysJson(): Promise<string>;
+  generateOneTimeKeysJson(count: number): Promise<string>;
+  markKeysAsPublished(): Promise<Object>;
 
   // Cleanup
   destroy(): Promise<Object>;
@@ -111,6 +114,9 @@ export interface NativeMatrixCryptoInterface {
   createOlmSession(userId: string, deviceId: string, theirIdentityKey: string, theirOneTimeKey: string): Promise<{ success: boolean }>;
   olmEncrypt(userId: string, deviceId: string, plaintext: string): Promise<string>;
   olmDecrypt(senderIdentityKey: string, msgType: number, ciphertextB64: string): Promise<string>;
+  getDeviceKeysJson(): Promise<string>;
+  generateOneTimeKeysJson(count: number): Promise<string>;
+  markKeysAsPublished(): Promise<{ success: boolean }>;
   destroy(): Promise<{ success: boolean }>;
 }
 
@@ -138,6 +144,9 @@ export const NativeMatrixCrypto: NativeMatrixCryptoInterface = {
   createOlmSession: (u, d, ik, otk) => NativeRNMatrixCrypto.createOlmSession(u, d, ik, otk) as any,
   olmEncrypt: (u, d, p) => NativeRNMatrixCrypto.olmEncrypt(u, d, p),
   olmDecrypt: (s, t, c) => NativeRNMatrixCrypto.olmDecrypt(s, t, c),
+  getDeviceKeysJson: () => NativeRNMatrixCrypto.getDeviceKeysJson(),
+  generateOneTimeKeysJson: (c) => NativeRNMatrixCrypto.generateOneTimeKeysJson(c),
+  markKeysAsPublished: () => NativeRNMatrixCrypto.markKeysAsPublished() as any,
   destroy: () => NativeRNMatrixCrypto.destroy() as any,
 };
 

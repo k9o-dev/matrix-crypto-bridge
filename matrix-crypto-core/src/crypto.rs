@@ -543,4 +543,115 @@ impl MatrixCrypto {
                 ))
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Device key and one-time key upload helpers  (needed for T1-1: other
+    // devices can only Olm-encrypt to-device messages for us after we upload
+    // our Curve25519 identity key and signed one-time keys to the homeserver)
+    // -----------------------------------------------------------------------
+
+    /// Return the signed device keys JSON body for `POST /keys/upload`.
+    ///
+    /// The returned string is a JSON object with `algorithms`, `device_id`,
+    /// `keys` (curve25519 + ed25519) and a `signatures` dict signed with the
+    /// account's Ed25519 key — ready to embed in the `device_keys` field of
+    /// the `/keys/upload` request body.
+    pub fn get_device_keys_json(&self) -> Result<String, CryptoError> {
+        let account = self.olm_account.lock().unwrap();
+        let identity_keys = account.identity_keys();
+        let curve25519_b64 = identity_keys.curve25519.to_base64();
+        let ed25519_b64 = identity_keys.ed25519.to_base64();
+
+        // Build the to-be-signed object using BTreeMap so keys are sorted
+        // (canonical JSON for Matrix signatures requires sorted keys).
+        let mut unsigned: std::collections::BTreeMap<&str, serde_json::Value> = std::collections::BTreeMap::new();
+        unsigned.insert("algorithms", serde_json::json!([
+            "m.olm.v1.curve25519-aes-sha2",
+            "m.megolm.v1.aes-sha2"
+        ]));
+        unsigned.insert("device_id", serde_json::Value::String(self.device_id.clone()));
+        unsigned.insert("keys", serde_json::json!({
+            format!("curve25519:{}", self.device_id): &curve25519_b64,
+            format!("ed25519:{}", self.device_id): &ed25519_b64,
+        }));
+        unsigned.insert("user_id", serde_json::Value::String(self.user_id.clone()));
+
+        let to_sign = serde_json::to_string(&unsigned)
+            .map_err(|e| CryptoError::Unknown(e.to_string()))?;
+        let signature = account.sign(&to_sign);
+        let sig_value = serde_json::to_value(&signature)
+            .map_err(|e| CryptoError::Unknown(e.to_string()))?;
+        let sig_b64: String = serde_json::from_value(sig_value)
+            .map_err(|e| CryptoError::Unknown(e.to_string()))?;
+
+        let device_keys = serde_json::json!({
+            "algorithms": ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+            "device_id": &self.device_id,
+            "keys": {
+                format!("curve25519:{}", self.device_id): &curve25519_b64,
+                format!("ed25519:{}", self.device_id): &ed25519_b64,
+            },
+            "user_id": &self.user_id,
+            "signatures": {
+                &self.user_id: {
+                    format!("ed25519:{}", self.device_id): sig_b64
+                }
+            }
+        });
+
+        serde_json::to_string(&device_keys)
+            .map_err(|e| CryptoError::Unknown(e.to_string()))
+    }
+
+    /// Generate `count` new one-time keys and return them as the signed JSON
+    /// object expected by the `one_time_keys` field of `POST /keys/upload`.
+    ///
+    /// Each key is of type `signed_curve25519` and has a signature created by
+    /// the account's Ed25519 signing key.
+    ///
+    /// Call `mark_keys_as_published()` after a successful upload so vodozemac
+    /// stops returning the same keys on subsequent calls.
+    pub fn generate_one_time_keys_json(&self, count: u32) -> Result<String, CryptoError> {
+        let mut account = self.olm_account.lock().unwrap();
+        account.generate_one_time_keys(count as usize);
+
+        let otks = account.one_time_keys();
+        let mut result: std::collections::BTreeMap<String, serde_json::Value> = std::collections::BTreeMap::new();
+
+        for (key_id, curve25519_key) in &otks {
+            let key_b64 = curve25519_key.to_base64();
+
+            // Canonical JSON for the key object (sorted single-key object)
+            let to_sign = format!(r#"{{"key":"{}"}}"#, key_b64);
+            let signature = account.sign(&to_sign);
+            let sig_value = serde_json::to_value(&signature)
+                .map_err(|e| CryptoError::Unknown(e.to_string()))?;
+            let sig_b64: String = serde_json::from_value(sig_value)
+                .map_err(|e| CryptoError::Unknown(e.to_string()))?;
+
+            let signed_key = serde_json::json!({
+                "key": key_b64,
+                "signatures": {
+                    &self.user_id: {
+                        format!("ed25519:{}", self.device_id): sig_b64
+                    }
+                }
+            });
+
+            result.insert(format!("signed_curve25519:{}", key_id), signed_key);
+        }
+
+        serde_json::to_string(&result)
+            .map_err(|e| CryptoError::Unknown(e.to_string()))
+    }
+
+    /// Mark the current batch of one-time keys as published.
+    ///
+    /// Must be called after a successful `POST /keys/upload` so vodozemac
+    /// rotates to a fresh set and doesn't re-serve the same OTKs.
+    pub fn mark_keys_as_published(&self) -> Result<(), CryptoError> {
+        let mut account = self.olm_account.lock().unwrap();
+        account.mark_keys_as_published();
+        Ok(())
+    }
 }

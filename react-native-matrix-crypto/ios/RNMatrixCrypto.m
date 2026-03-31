@@ -126,4 +126,15 @@ RCT_EXTERN_METHOD(olmDecrypt:(NSString *)senderIdentityKey
 RCT_EXTERN_METHOD(destroy:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+// Key Upload (T1-1)
+RCT_EXTERN_METHOD(getDeviceKeysJson:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(generateOneTimeKeysJson:(nonnull NSNumber *)count
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(markKeysAsPublished:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 @end

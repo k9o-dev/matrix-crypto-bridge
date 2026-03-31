@@ -140,4 +140,14 @@ interface MatrixCrypto {
 
     [Throws=CryptoError]
     string olm_decrypt(string sender_identity_key, u32 msg_type, string ciphertext_b64);
+
+    // Device key and one-time key upload (needed so other devices can send us Olm to-device messages)
+    [Throws=CryptoError]
+    string get_device_keys_json();
+
+    [Throws=CryptoError]
+    string generate_one_time_keys_json(u32 count);
+
+    [Throws=CryptoError]
+    void mark_keys_as_published();
 };
