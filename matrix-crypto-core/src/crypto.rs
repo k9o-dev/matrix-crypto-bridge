@@ -240,7 +240,6 @@ impl MatrixCrypto {
         event_type: String,
         content: String,
     ) -> Result<String, CryptoError> {
-        let signing_key = self.olm_account.identity_keys().ed25519;
         let curve25519_key = self.olm_account.identity_keys().curve25519.to_base64();
 
         let mut sessions = self.sessions.lock().unwrap();
@@ -251,10 +250,8 @@ impl MatrixCrypto {
             let session_key = outbound.session_key();
             let session_id = outbound.session_id().to_owned();
 
-            let inbound = InboundGroupSession::new(&session_key, &signing_key)
-                .map_err(|e| CryptoError::EncryptionFailed(
-                    format!("Failed to create inbound Megolm session: {e}")
-                ))?;
+            // vodozemac 0.7: InboundGroupSession::new(&SessionKey, SessionConfig) -> Self
+            let inbound = InboundGroupSession::new(&session_key, SessionConfig::version_1());
 
             sessions.inbound.insert(session_id, inbound);
             sessions.outbound.insert(room_id.clone(), outbound);
