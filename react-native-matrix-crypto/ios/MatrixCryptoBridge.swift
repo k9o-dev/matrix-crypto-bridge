@@ -130,6 +130,70 @@ import Foundation
         )
     }
 
+    // MARK: - Key Exchange (T1-1: Olm key sharing)
+
+    @objc public static func getIdentityKey() throws -> String {
+        return try requireInstance().getIdentityKey()
+    }
+
+    @objc public static func getOutboundSessionKey(roomId: String) throws -> String {
+        return try requireInstance().getOutboundSessionKey(roomId: roomId)
+    }
+
+    @objc public static func getOutboundSessionId(roomId: String) throws -> String {
+        return try requireInstance().getOutboundSessionId(roomId: roomId)
+    }
+
+    @objc public static func addInboundSession(
+        roomId: String,
+        senderKey: String,
+        sessionKeyBase64: String
+    ) throws {
+        try requireInstance().addInboundSession(
+            roomId: roomId,
+            senderKey: senderKey,
+            sessionKeyBase64: sessionKeyBase64
+        )
+    }
+
+    @objc public static func createOlmSession(
+        userId: String,
+        deviceId: String,
+        theirIdentityKey: String,
+        theirOneTimeKey: String
+    ) throws {
+        try requireInstance().createOlmSession(
+            userId: userId,
+            deviceId: deviceId,
+            theirIdentityKey: theirIdentityKey,
+            theirOneTimeKey: theirOneTimeKey
+        )
+    }
+
+    @objc public static func olmEncrypt(
+        userId: String,
+        deviceId: String,
+        plaintext: String
+    ) throws -> String {
+        return try requireInstance().olmEncrypt(
+            userId: userId,
+            deviceId: deviceId,
+            plaintext: plaintext
+        )
+    }
+
+    @objc public static func olmDecrypt(
+        senderIdentityKey: String,
+        msgType: UInt32,
+        ciphertextB64: String
+    ) throws -> String {
+        return try requireInstance().olmDecrypt(
+            senderIdentityKey: senderIdentityKey,
+            msgType: msgType,
+            ciphertextB64: ciphertextB64
+        )
+    }
+
     // MARK: - Private Helpers
 
     private static func requireInstance() throws -> MatrixCrypto {

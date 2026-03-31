@@ -52,6 +52,15 @@ export interface Spec extends TurboModule {
   encryptEvent(roomId: string, eventType: string, content: string): Promise<string>;
   decryptEvent(roomId: string, encryptedContent: string): Promise<string>;
 
+  // Key Exchange (T1-1)
+  getIdentityKey(): Promise<string>;
+  getOutboundSessionKey(roomId: string): Promise<string>;
+  getOutboundSessionId(roomId: string): Promise<string>;
+  addInboundSession(roomId: string, senderKey: string, sessionKeyBase64: string): Promise<Object>;
+  createOlmSession(userId: string, deviceId: string, theirIdentityKey: string, theirOneTimeKey: string): Promise<Object>;
+  olmEncrypt(userId: string, deviceId: string, plaintext: string): Promise<string>;
+  olmDecrypt(senderIdentityKey: string, msgType: number, ciphertextB64: string): Promise<string>;
+
   // Cleanup
   destroy(): Promise<Object>;
 }
@@ -95,6 +104,13 @@ export interface NativeMatrixCryptoInterface {
   }>;
   encryptEvent(roomId: string, eventType: string, content: string): Promise<string>;
   decryptEvent(roomId: string, encryptedContent: string): Promise<string>;
+  getIdentityKey(): Promise<string>;
+  getOutboundSessionKey(roomId: string): Promise<string>;
+  getOutboundSessionId(roomId: string): Promise<string>;
+  addInboundSession(roomId: string, senderKey: string, sessionKeyBase64: string): Promise<{ success: boolean }>;
+  createOlmSession(userId: string, deviceId: string, theirIdentityKey: string, theirOneTimeKey: string): Promise<{ success: boolean }>;
+  olmEncrypt(userId: string, deviceId: string, plaintext: string): Promise<string>;
+  olmDecrypt(senderIdentityKey: string, msgType: number, ciphertextB64: string): Promise<string>;
   destroy(): Promise<{ success: boolean }>;
 }
 
@@ -115,6 +131,13 @@ export const NativeMatrixCrypto: NativeMatrixCryptoInterface = {
   getRoomEncryptionState: (r) => NativeRNMatrixCrypto.getRoomEncryptionState(r) as any,
   encryptEvent: (r, t, c) => NativeRNMatrixCrypto.encryptEvent(r, t, c),
   decryptEvent: (r, c) => NativeRNMatrixCrypto.decryptEvent(r, c),
+  getIdentityKey: () => NativeRNMatrixCrypto.getIdentityKey(),
+  getOutboundSessionKey: (r) => NativeRNMatrixCrypto.getOutboundSessionKey(r),
+  getOutboundSessionId: (r) => NativeRNMatrixCrypto.getOutboundSessionId(r),
+  addInboundSession: (r, s, k) => NativeRNMatrixCrypto.addInboundSession(r, s, k) as any,
+  createOlmSession: (u, d, ik, otk) => NativeRNMatrixCrypto.createOlmSession(u, d, ik, otk) as any,
+  olmEncrypt: (u, d, p) => NativeRNMatrixCrypto.olmEncrypt(u, d, p),
+  olmDecrypt: (s, t, c) => NativeRNMatrixCrypto.olmDecrypt(s, t, c),
   destroy: () => NativeRNMatrixCrypto.destroy() as any,
 };
 

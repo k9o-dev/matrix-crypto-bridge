@@ -252,6 +252,54 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
+    // MARK: - Key Exchange (T1-1)
+
+    @objc(getIdentityKey:reject:)
+    func getIdentityKey(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { resolve(try MatrixCryptoBridge.getIdentityKey()) }
+        catch { reject("GET_IDENTITY_KEY_ERROR", "Failed to get identity key: \(error.localizedDescription)", error) }
+    }
+
+    @objc(getOutboundSessionKey:resolve:reject:)
+    func getOutboundSessionKey(roomId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { resolve(try MatrixCryptoBridge.getOutboundSessionKey(roomId: roomId)) }
+        catch { reject("GET_SESSION_KEY_ERROR", "Failed to get outbound session key: \(error.localizedDescription)", error) }
+    }
+
+    @objc(getOutboundSessionId:resolve:reject:)
+    func getOutboundSessionId(roomId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { resolve(try MatrixCryptoBridge.getOutboundSessionId(roomId: roomId)) }
+        catch { reject("GET_SESSION_ID_ERROR", "Failed to get outbound session id: \(error.localizedDescription)", error) }
+    }
+
+    @objc(addInboundSession:senderKey:sessionKeyBase64:resolve:reject:)
+    func addInboundSession(roomId: String, senderKey: String, sessionKeyBase64: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            try MatrixCryptoBridge.addInboundSession(roomId: roomId, senderKey: senderKey, sessionKeyBase64: sessionKeyBase64)
+            resolve(["success": true])
+        } catch { reject("ADD_INBOUND_SESSION_ERROR", "Failed to add inbound session: \(error.localizedDescription)", error) }
+    }
+
+    @objc(createOlmSession:deviceId:theirIdentityKey:theirOneTimeKey:resolve:reject:)
+    func createOlmSession(userId: String, deviceId: String, theirIdentityKey: String, theirOneTimeKey: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do {
+            try MatrixCryptoBridge.createOlmSession(userId: userId, deviceId: deviceId, theirIdentityKey: theirIdentityKey, theirOneTimeKey: theirOneTimeKey)
+            resolve(["success": true])
+        } catch { reject("CREATE_OLM_SESSION_ERROR", "Failed to create Olm session: \(error.localizedDescription)", error) }
+    }
+
+    @objc(olmEncrypt:deviceId:plaintext:resolve:reject:)
+    func olmEncrypt(userId: String, deviceId: String, plaintext: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { resolve(try MatrixCryptoBridge.olmEncrypt(userId: userId, deviceId: deviceId, plaintext: plaintext)) }
+        catch { reject("OLM_ENCRYPT_ERROR", "Failed to Olm encrypt: \(error.localizedDescription)", error) }
+    }
+
+    @objc(olmDecrypt:msgType:ciphertextB64:resolve:reject:)
+    func olmDecrypt(senderIdentityKey: String, msgType: UInt32, ciphertextB64: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        do { resolve(try MatrixCryptoBridge.olmDecrypt(senderIdentityKey: senderIdentityKey, msgType: msgType, ciphertextB64: ciphertextB64)) }
+        catch { reject("OLM_DECRYPT_ERROR", "Failed to Olm decrypt: \(error.localizedDescription)", error) }
+    }
+
     // MARK: - Cleanup
 
     @objc(destroy:reject:)

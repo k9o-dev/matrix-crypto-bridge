@@ -85,6 +85,43 @@ RCT_EXTERN_METHOD(decryptEvent:(NSString *)roomId
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+// Key Exchange (T1-1)
+RCT_EXTERN_METHOD(getIdentityKey:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(getOutboundSessionKey:(NSString *)roomId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(getOutboundSessionId:(NSString *)roomId
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(addInboundSession:(NSString *)roomId
+                  senderKey:(NSString *)senderKey
+                  sessionKeyBase64:(NSString *)sessionKeyBase64
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(createOlmSession:(NSString *)userId
+                  deviceId:(NSString *)deviceId
+                  theirIdentityKey:(NSString *)theirIdentityKey
+                  theirOneTimeKey:(NSString *)theirOneTimeKey
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(olmEncrypt:(NSString *)userId
+                  deviceId:(NSString *)deviceId
+                  plaintext:(NSString *)plaintext
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(olmDecrypt:(NSString *)senderIdentityKey
+                  msgType:(nonnull NSNumber *)msgType
+                  ciphertextB64:(NSString *)ciphertextB64
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 // Cleanup
 RCT_EXTERN_METHOD(destroy:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)

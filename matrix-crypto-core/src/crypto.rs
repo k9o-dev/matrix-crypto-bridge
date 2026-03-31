@@ -4,7 +4,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use vodozemac::megolm::{GroupSession, InboundGroupSession, SessionConfig, MegolmMessage};
-use vodozemac::olm::Account;
+use vodozemac::olm::{Account, Session as OlmSession, SessionConfig as OlmSessionConfig};
+use vodozemac::Curve25519PublicKey;
 
 // ---------------------------------------------------------------------------
 // Combined Megolm session store — one mutex to avoid nested-lock deadlocks.
@@ -36,12 +37,20 @@ pub struct MatrixCrypto {
     user_id: String,
     device_id: String,
     device_fingerprint: String,
+    /// Ed25519 identity key (base64) for signing.
+    ed25519_key: String,
+    /// Curve25519 identity key (base64) for Olm session establishment.
+    curve25519_key: String,
     /// Olm account — holds this device's Ed25519 (signing) and Curve25519
-    /// (identity) key pairs.  Used as the signing key when creating inbound
-    /// Megolm sessions so that the session is tied to our device.
-    olm_account: Account,
+    /// (identity) key pairs.  Wrapped in Mutex so create_inbound_session
+    /// (which needs &mut Account) can be called from &self methods.
+    olm_account: Arc<Mutex<Account>>,
     /// Megolm session store.
     sessions: Arc<Mutex<MegolmSessions>>,
+    /// Olm sessions for to-device message encryption/decryption.
+    /// Keyed by "{user_id}:{device_id}" for outbound sessions, and
+    /// by session_id for inbound sessions from prekey messages.
+    olm_sessions: Arc<Mutex<HashMap<String, OlmSession>>>,
     /// Storage for device verifications
     verifications: Arc<Mutex<HashMap<String, VerificationState>>>,
     /// Storage for device info
@@ -64,14 +73,20 @@ impl MatrixCrypto {
 
         // Create a fresh Olm account — gives us real Ed25519 / Curve25519 keys.
         let olm_account = Account::new();
-        let fingerprint = olm_account.identity_keys().ed25519.to_base64();
+        let identity_keys = olm_account.identity_keys();
+        let ed25519_key = identity_keys.ed25519.to_base64();
+        let curve25519_key = identity_keys.curve25519.to_base64();
+        let fingerprint = ed25519_key.clone();
 
         Ok(MatrixCrypto {
             user_id,
             device_id,
             device_fingerprint: fingerprint,
-            olm_account,
+            ed25519_key,
+            curve25519_key,
+            olm_account: Arc::new(Mutex::new(olm_account)),
             sessions: Arc::new(Mutex::new(MegolmSessions::new())),
+            olm_sessions: Arc::new(Mutex::new(HashMap::new())),
             verifications: Arc::new(Mutex::new(HashMap::new())),
             devices: Arc::new(Mutex::new(HashMap::new())),
             rooms: Arc::new(Mutex::new(HashMap::new())),
@@ -91,6 +106,11 @@ impl MatrixCrypto {
     /// Get the device ID
     pub fn device_id(&self) -> String {
         self.device_id.clone()
+    }
+
+    /// Get our Curve25519 identity key (base64) for Olm session establishment.
+    pub fn get_identity_key(&self) -> Result<String, CryptoError> {
+        Ok(self.curve25519_key.clone())
     }
 
     /// Get devices for a user
@@ -240,8 +260,6 @@ impl MatrixCrypto {
         event_type: String,
         content: String,
     ) -> Result<String, CryptoError> {
-        let curve25519_key = self.olm_account.identity_keys().curve25519.to_base64();
-
         let mut sessions = self.sessions.lock().unwrap();
 
         // Create outbound + inbound session pair on first use for this room.
@@ -274,7 +292,7 @@ impl MatrixCrypto {
             r#"{{"algorithm":"m.megolm.v1.aes-sha2","ciphertext":"{}","device_id":"{}","sender_key":"{}","session_id":"{}"}}"#,
             msg.to_base64(),
             self.device_id,
-            curve25519_key,
+            self.curve25519_key,
             session_id,
         ))
     }
@@ -339,5 +357,190 @@ impl MatrixCrypto {
             ))?;
 
         Ok(plaintext)
+    }
+
+    // -----------------------------------------------------------------------
+    // Megolm session key export / import  (T1-1: cross-device key sharing)
+    // -----------------------------------------------------------------------
+
+    /// Export the outbound Megolm session key for a room so it can be shared
+    /// with other devices via an Olm-encrypted `m.room_key` to-device message.
+    ///
+    /// The returned string is the base64-encoded session key that can be
+    /// deserialised on the receiving device with `add_inbound_session`.
+    pub fn get_outbound_session_key(&self, room_id: String) -> Result<String, CryptoError> {
+        let sessions = self.sessions.lock().unwrap();
+        let outbound = sessions.outbound.get(&room_id)
+            .ok_or_else(|| CryptoError::EncryptionFailed(
+                format!("No outbound session for room {room_id}")
+            ))?;
+        // SessionKey serialises as a base64 JSON string via serde.
+        let key_value = serde_json::to_value(outbound.session_key())
+            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+        let key_b64: String = serde_json::from_value(key_value)
+            .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
+        Ok(key_b64)
+    }
+
+    /// Return the session_id of the current outbound session for a room.
+    /// Needed so the sender can include session_id in the m.room_key content.
+    pub fn get_outbound_session_id(&self, room_id: String) -> Result<String, CryptoError> {
+        let sessions = self.sessions.lock().unwrap();
+        let outbound = sessions.outbound.get(&room_id)
+            .ok_or_else(|| CryptoError::EncryptionFailed(
+                format!("No outbound session for room {room_id}")
+            ))?;
+        Ok(outbound.session_id().to_owned())
+    }
+
+    /// Import a Megolm inbound session from a received `m.room_key` to-device
+    /// message.  After calling this method the device can decrypt any Megolm
+    /// messages in `room_id` that were encrypted with the matching session.
+    pub fn add_inbound_session(
+        &self,
+        room_id: String,
+        _sender_key: String,
+        session_key_base64: String,
+    ) -> Result<(), CryptoError> {
+        // SessionKey deserialises from a base64 JSON string.
+        let key_value = serde_json::Value::String(session_key_base64);
+        let session_key: vodozemac::megolm::SessionKey = serde_json::from_value(key_value)
+            .map_err(|e| CryptoError::DecryptionFailed(
+                format!("Invalid session key base64: {e}")
+            ))?;
+        let inbound = InboundGroupSession::new(&session_key, SessionConfig::version_1());
+        let session_id = inbound.session_id().to_owned();
+        let mut sessions = self.sessions.lock().unwrap();
+        sessions.inbound.insert(session_id, inbound);
+        Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Olm to-device encryption / decryption  (T1-1: key transport)
+    // -----------------------------------------------------------------------
+
+    /// Create an outbound Olm session with a remote device.
+    ///
+    /// Must be called once per device before `olm_encrypt`.
+    /// `their_identity_key` and `their_one_time_key` are base64-encoded
+    /// Curve25519 public keys obtained from the homeserver via `/keys/claim`.
+    pub fn create_olm_session(
+        &self,
+        user_id: String,
+        device_id: String,
+        their_identity_key: String,
+        their_one_time_key: String,
+    ) -> Result<(), CryptoError> {
+        let identity_key = Curve25519PublicKey::from_base64(&their_identity_key)
+            .map_err(|e| CryptoError::EncryptionFailed(
+                format!("Invalid identity key: {e}")
+            ))?;
+        let one_time_key = Curve25519PublicKey::from_base64(&their_one_time_key)
+            .map_err(|e| CryptoError::EncryptionFailed(
+                format!("Invalid one-time key: {e}")
+            ))?;
+        let session = {
+            let account = self.olm_account.lock().unwrap();
+            account.create_outbound_session(
+                OlmSessionConfig::version_1(),
+                identity_key,
+                one_time_key,
+            )
+        };
+        let key = format!("{}:{}", user_id, device_id);
+        self.olm_sessions.lock().unwrap().insert(key, session);
+        Ok(())
+    }
+
+    /// Encrypt a plaintext string for a specific remote device using an
+    /// existing Olm session created by `create_olm_session`.
+    ///
+    /// Returns a JSON object: `{"type":<0|1>,"body":"<base64_ciphertext>"}`
+    /// where type 0 = PreKey message (first message), 1 = normal message.
+    pub fn olm_encrypt(
+        &self,
+        user_id: String,
+        device_id: String,
+        plaintext: String,
+    ) -> Result<String, CryptoError> {
+        let key = format!("{}:{}", user_id, device_id);
+        let mut olm_sessions = self.olm_sessions.lock().unwrap();
+        let session = olm_sessions.get_mut(&key)
+            .ok_or_else(|| CryptoError::EncryptionFailed(
+                format!("No Olm session for {key} — call create_olm_session first")
+            ))?;
+        let message = session.encrypt(plaintext.as_bytes());
+        let (msg_type, body) = match message {
+            vodozemac::olm::OlmMessage::Normal(m) => (1usize, m.to_base64()),
+            vodozemac::olm::OlmMessage::PreKey(m) => (0usize, m.to_base64()),
+        };
+        Ok(format!(r#"{{"type":{},"body":"{}"}}"#, msg_type, body))
+    }
+
+    /// Decrypt an Olm-encrypted to-device message addressed to this device.
+    ///
+    /// `sender_identity_key` is the sender's Curve25519 key (base64).
+    /// `msg_type` is 0 for PreKey, 1 for Normal.
+    /// `ciphertext_b64` is the base64-encoded ciphertext from the `body` field.
+    ///
+    /// For PreKey messages (type 0) a new inbound Olm session is created from
+    /// our account and stored for future normal messages from the same sender.
+    ///
+    /// Returns the decrypted plaintext string.
+    pub fn olm_decrypt(
+        &self,
+        sender_identity_key: String,
+        msg_type: u32,
+        ciphertext_b64: String,
+    ) -> Result<String, CryptoError> {
+        use vodozemac::olm::OlmMessage;
+
+        let sender_key = Curve25519PublicKey::from_base64(&sender_identity_key)
+            .map_err(|e| CryptoError::DecryptionFailed(
+                format!("Invalid sender identity key: {e}")
+            ))?;
+
+        if msg_type == 0 {
+            // PreKey message: create a new inbound session from our account.
+            let prekey_msg = vodozemac::olm::messages::PreKeyMessage::from_base64(&ciphertext_b64)
+                .map_err(|e| CryptoError::DecryptionFailed(
+                    format!("Invalid PreKey message: {e}")
+                ))?;
+            let mut account = self.olm_account.lock().unwrap();
+            let result = account
+                .create_inbound_session(sender_key, &prekey_msg)
+                .map_err(|e| CryptoError::DecryptionFailed(
+                    format!("Failed to create inbound Olm session: {e}")
+                ))?;
+            // Store the new inbound session keyed by the sender identity key
+            // so future normal messages from this device can be decrypted.
+            drop(account);
+            self.olm_sessions.lock().unwrap()
+                .insert(sender_identity_key, result.session);
+            String::from_utf8(result.plaintext)
+                .map_err(|_| CryptoError::DecryptionFailed(
+                    "Olm plaintext is not valid UTF-8".to_string()
+                ))
+        } else {
+            // Normal message: look up the existing inbound session by sender key.
+            let mut olm_sessions = self.olm_sessions.lock().unwrap();
+            let session = olm_sessions.get_mut(&sender_identity_key)
+                .ok_or_else(|| CryptoError::DecryptionFailed(
+                    format!("No Olm session for sender key {sender_identity_key}")
+                ))?;
+            let msg = vodozemac::olm::messages::Message::from_base64(&ciphertext_b64)
+                .map_err(|e| CryptoError::DecryptionFailed(
+                    format!("Invalid Olm Normal message: {e}")
+                ))?;
+            let plaintext = session
+                .decrypt(&OlmMessage::Normal(msg))
+                .map_err(|e| CryptoError::DecryptionFailed(
+                    format!("Olm decryption error: {e}")
+                ))?;
+            String::from_utf8(plaintext)
+                .map_err(|_| CryptoError::DecryptionFailed(
+                    "Olm plaintext is not valid UTF-8".to_string()
+                ))
+        }
     }
 }

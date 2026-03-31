@@ -116,4 +116,28 @@ interface MatrixCrypto {
 
     [Throws=CryptoError]
     string decrypt_event(string room_id, string encrypted_content);
+
+    // Key identity
+    [Throws=CryptoError]
+    string get_identity_key();
+
+    // Megolm session key export / import (for m.room_key sharing)
+    [Throws=CryptoError]
+    string get_outbound_session_key(string room_id);
+
+    [Throws=CryptoError]
+    string get_outbound_session_id(string room_id);
+
+    [Throws=CryptoError]
+    void add_inbound_session(string room_id, string sender_key, string session_key_base64);
+
+    // Olm to-device encryption
+    [Throws=CryptoError]
+    void create_olm_session(string user_id, string device_id, string their_identity_key, string their_one_time_key);
+
+    [Throws=CryptoError]
+    string olm_encrypt(string user_id, string device_id, string plaintext);
+
+    [Throws=CryptoError]
+    string olm_decrypt(string sender_identity_key, u32 msg_type, string ciphertext_b64);
 };
