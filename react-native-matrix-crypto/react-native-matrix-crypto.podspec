@@ -33,8 +33,13 @@ Pod::Spec.new do |s|
 
   s.public_header_files = "ios/matrix_cryptoFFI.h"
 
-  # Only React-Core is needed — the Rust library is vendored above.
+  # React-Core is always needed.
+  # React-NativeModulesApple provides <ReactCommon/RCTTurboModule.h>, which is
+  # a transitive dependency of the codegen-generated RNMatrixCryptoSpec.h on
+  # New Architecture builds. Without it the pod fails to compile with:
+  #   'ReactCommon/RCTTurboModule.h' file not found
   s.dependency "React-Core"
+  s.dependency "React-NativeModulesApple"
 
   s.pod_target_xcconfig = {
     "OTHER_LDFLAGS"  => "-lc++ -lresolv",
