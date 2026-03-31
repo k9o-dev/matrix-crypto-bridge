@@ -25,3 +25,40 @@ export type {
 export { NativeMatrixCrypto } from './NativeMatrixCrypto';
 export { NativeMatrixCrypto as MatrixCrypto } from './NativeMatrixCrypto';
 export { NativeMatrixCrypto as default } from './NativeMatrixCrypto';
+
+// ---------------------------------------------------------------------------
+// Shared domain types — kept here so CryptoAPI.ts and other consumers can
+// import them from the package root without a deep path.
+// ---------------------------------------------------------------------------
+
+export interface DeviceInfo {
+  deviceId: string;
+  userId: string;
+  displayName?: string;
+  fingerprint: string;
+  isVerified: boolean;
+  isBlocked: boolean;
+  algorithm: string;
+}
+
+export interface EmojiSASPair {
+  emoji: string;
+  name: string;
+}
+
+export interface VerificationState {
+  verificationId: string;
+  state: 'pending' | 'sas_ready' | 'confirmed' | 'completed' | 'cancelled';
+  otherUserId: string;
+  otherDeviceId: string;
+  emojis: EmojiSASPair[];
+  decimals: number[];
+}
+
+export interface RoomEncryptionState {
+  roomId: string;
+  isEncrypted: boolean;
+  algorithm?: string;
+  trustedDevices: string[];
+  untrustedDevices: string[];
+}
