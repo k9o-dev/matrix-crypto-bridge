@@ -1,5 +1,5 @@
 import { NativeMatrixCrypto } from './NativeMatrixCrypto';
-import {
+import type {
   DeviceInfo,
   EmojiSASPair,
   VerificationState,
