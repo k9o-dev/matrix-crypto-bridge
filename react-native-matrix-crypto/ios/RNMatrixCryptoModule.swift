@@ -3,18 +3,22 @@ import React
 
 /// React Native bridge for Matrix crypto on iOS.
 /// Delegates to MatrixCryptoBridge static methods — no instance needed.
+///
+/// IMPORTANT: This module uses TurboModule-style promises (implicit JSI handling)
+/// rather than explicit RCTPromiseResolveBlock/RCTPromiseRejectBlock parameters.
+/// This ensures compatibility with React Native New Architecture codegen.
 @objc(RNMatrixCrypto)
 class RNMatrixCrypto: NSObject {
 
     // MARK: - Initialization
 
-    @objc(initialize:deviceId:pickleKey:resolve:reject:)
+    @objc(initialize:deviceId:pickleKey:withResolver:withRejecter:)
     func initialize(
         userId: String,
         deviceId: String,
         pickleKey: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             try MatrixCryptoBridge.initialize(
@@ -30,10 +34,10 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Device Information
 
-    @objc(getDeviceFingerprint:reject:)
+    @objc(getDeviceFingerprint:withRejecter:)
     func getDeviceFingerprint(
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.getDeviceFingerprint())
@@ -42,10 +46,10 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getUserId:reject:)
+    @objc(getUserId:withRejecter:)
     func getUserId(
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.getUserId())
@@ -54,10 +58,10 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getDeviceId:reject:)
+    @objc(getDeviceId:withRejecter:)
     func getDeviceId(
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.getDeviceId())
@@ -68,11 +72,11 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Device Management
 
-    @objc(getUserDevices:resolve:reject:)
+    @objc(getUserDevices:withResolver:withRejecter:)
     func getUserDevices(
         userId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.getUserDevices(userId: userId))
@@ -81,11 +85,11 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(addDevice:resolve:reject:)
+    @objc(addDevice:withResolver:withRejecter:)
     func addDevice(
         device: [String: Any],
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             try MatrixCryptoBridge.addDevice(device: device)
@@ -97,12 +101,12 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Device Verification
 
-    @objc(startVerification:otherDeviceId:resolve:reject:)
+    @objc(startVerification:otherDeviceId:withResolver:withRejecter:)
     func startVerification(
         otherUserId: String,
         otherDeviceId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.startVerification(
@@ -114,11 +118,11 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getSASEmojis:resolve:reject:)
+    @objc(getSASEmojis:withResolver:withRejecter:)
     func getSASEmojis(
         verificationId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             // MatrixCryptoBridge uses camelCase: getSasEmojis
@@ -128,11 +132,11 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(confirmSAS:resolve:reject:)
+    @objc(confirmSAS:withResolver:withRejecter:)
     func confirmSAS(
         verificationId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             // MatrixCryptoBridge uses camelCase: confirmSas
@@ -143,11 +147,11 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(completeVerification:resolve:reject:)
+    @objc(completeVerification:withResolver:withRejecter:)
     func completeVerification(
         verificationId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             try MatrixCryptoBridge.completeVerification(verificationId: verificationId)
@@ -157,11 +161,11 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(cancelVerification:resolve:reject:)
+    @objc(cancelVerification:withResolver:withRejecter:)
     func cancelVerification(
         verificationId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             try MatrixCryptoBridge.cancelVerification(verificationId: verificationId)
@@ -171,11 +175,11 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getVerificationState:resolve:reject:)
+    @objc(getVerificationState:withResolver:withRejecter:)
     func getVerificationState(
         verificationId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.getVerificationState(verificationId: verificationId))
@@ -186,12 +190,12 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Room Encryption
 
-    @objc(enableRoomEncryption:algorithm:resolve:reject:)
+    @objc(enableRoomEncryption:algorithm:withResolver:withRejecter:)
     func enableRoomEncryption(
         roomId: String,
         algorithm: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             try MatrixCryptoBridge.enableRoomEncryption(roomId: roomId, algorithm: algorithm)
@@ -201,11 +205,11 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(getRoomEncryptionState:resolve:reject:)
+    @objc(getRoomEncryptionState:withResolver:withRejecter:)
     func getRoomEncryptionState(
         roomId: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.getRoomEncryptionState(roomId: roomId))
@@ -216,13 +220,13 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Event Encryption/Decryption
 
-    @objc(encryptEvent:eventType:content:resolve:reject:)
+    @objc(encryptEvent:eventType:content:withResolver:withRejecter:)
     func encryptEvent(
         roomId: String,
         eventType: String,
         content: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.encryptEvent(
@@ -235,12 +239,12 @@ class RNMatrixCrypto: NSObject {
         }
     }
 
-    @objc(decryptEvent:encryptedContent:resolve:reject:)
+    @objc(decryptEvent:encryptedContent:withResolver:withRejecter:)
     func decryptEvent(
         roomId: String,
         encryptedContent: String,
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         do {
             resolve(try MatrixCryptoBridge.decryptEvent(
@@ -254,78 +258,78 @@ class RNMatrixCrypto: NSObject {
 
     // MARK: - Key Exchange (T1-1)
 
-    @objc(getIdentityKey:reject:)
-    func getIdentityKey(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(getIdentityKey:withRejecter:)
+    func getIdentityKey(withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { resolve(try MatrixCryptoBridge.getIdentityKey()) }
         catch { reject("GET_IDENTITY_KEY_ERROR", "Failed to get identity key: \(error.localizedDescription)", error) }
     }
 
-    @objc(getOutboundSessionKey:resolve:reject:)
-    func getOutboundSessionKey(roomId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(getOutboundSessionKey:withResolver:withRejecter:)
+    func getOutboundSessionKey(roomId: String, withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { resolve(try MatrixCryptoBridge.getOutboundSessionKey(roomId: roomId)) }
         catch { reject("GET_SESSION_KEY_ERROR", "Failed to get outbound session key: \(error.localizedDescription)", error) }
     }
 
-    @objc(getOutboundSessionId:resolve:reject:)
-    func getOutboundSessionId(roomId: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(getOutboundSessionId:withResolver:withRejecter:)
+    func getOutboundSessionId(roomId: String, withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { resolve(try MatrixCryptoBridge.getOutboundSessionId(roomId: roomId)) }
         catch { reject("GET_SESSION_ID_ERROR", "Failed to get outbound session id: \(error.localizedDescription)", error) }
     }
 
-    @objc(addInboundSession:senderKey:sessionKeyBase64:resolve:reject:)
-    func addInboundSession(roomId: String, senderKey: String, sessionKeyBase64: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(addInboundSession:senderKey:sessionKeyBase64:withResolver:withRejecter:)
+    func addInboundSession(roomId: String, senderKey: String, sessionKeyBase64: String, withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do {
             try MatrixCryptoBridge.addInboundSession(roomId: roomId, senderKey: senderKey, sessionKeyBase64: sessionKeyBase64)
             resolve(["success": true])
         } catch { reject("ADD_INBOUND_SESSION_ERROR", "Failed to add inbound session: \(error.localizedDescription)", error) }
     }
 
-    @objc(createOlmSession:deviceId:theirIdentityKey:theirOneTimeKey:resolve:reject:)
-    func createOlmSession(userId: String, deviceId: String, theirIdentityKey: String, theirOneTimeKey: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(createOlmSession:deviceId:theirIdentityKey:theirOneTimeKey:withResolver:withRejecter:)
+    func createOlmSession(userId: String, deviceId: String, theirIdentityKey: String, theirOneTimeKey: String, withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do {
             try MatrixCryptoBridge.createOlmSession(userId: userId, deviceId: deviceId, theirIdentityKey: theirIdentityKey, theirOneTimeKey: theirOneTimeKey)
             resolve(["success": true])
         } catch { reject("CREATE_OLM_SESSION_ERROR", "Failed to create Olm session: \(error.localizedDescription)", error) }
     }
 
-    @objc(olmEncrypt:deviceId:plaintext:resolve:reject:)
-    func olmEncrypt(userId: String, deviceId: String, plaintext: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(olmEncrypt:deviceId:plaintext:withResolver:withRejecter:)
+    func olmEncrypt(userId: String, deviceId: String, plaintext: String, withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { resolve(try MatrixCryptoBridge.olmEncrypt(userId: userId, deviceId: deviceId, plaintext: plaintext)) }
         catch { reject("OLM_ENCRYPT_ERROR", "Failed to Olm encrypt: \(error.localizedDescription)", error) }
     }
 
-    @objc(olmDecrypt:msgType:ciphertextB64:resolve:reject:)
-    func olmDecrypt(senderIdentityKey: String, msgType: UInt32, ciphertextB64: String, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(olmDecrypt:msgType:ciphertextB64:withResolver:withRejecter:)
+    func olmDecrypt(senderIdentityKey: String, msgType: UInt32, ciphertextB64: String, withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { resolve(try MatrixCryptoBridge.olmDecrypt(senderIdentityKey: senderIdentityKey, msgType: msgType, ciphertextB64: ciphertextB64)) }
         catch { reject("OLM_DECRYPT_ERROR", "Failed to Olm decrypt: \(error.localizedDescription)", error) }
     }
 
     // MARK: - Key Upload (T1-1)
 
-    @objc(getDeviceKeysJson:reject:)
-    func getDeviceKeysJson(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(getDeviceKeysJson:withRejecter:)
+    func getDeviceKeysJson(withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { resolve(try MatrixCryptoBridge.getDeviceKeysJson()) }
         catch { reject("GET_DEVICE_KEYS_ERROR", "Failed to get device keys: \(error.localizedDescription)", error) }
     }
 
-    @objc(generateOneTimeKeysJson:resolve:reject:)
-    func generateOneTimeKeysJson(count: UInt32, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(generateOneTimeKeysJson:withResolver:withRejecter:)
+    func generateOneTimeKeysJson(count: UInt32, withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { resolve(try MatrixCryptoBridge.generateOneTimeKeysJson(count: count)) }
         catch { reject("GEN_OTK_ERROR", "Failed to generate one-time keys: \(error.localizedDescription)", error) }
     }
 
-    @objc(markKeysAsPublished:reject:)
-    func markKeysAsPublished(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc(markKeysAsPublished:withRejecter:)
+    func markKeysAsPublished(withResolver resolve: @escaping RCTPromiseResolveBlock, withRejecter reject: @escaping RCTPromiseRejectBlock) {
         do { try MatrixCryptoBridge.markKeysAsPublished(); resolve(["success": true]) }
         catch { reject("MARK_PUBLISHED_ERROR", "Failed to mark keys as published: \(error.localizedDescription)", error) }
     }
 
     // MARK: - Cleanup
 
-    @objc(destroy:reject:)
+    @objc(destroy:withRejecter:)
     func destroy(
-        resolve: @escaping RCTPromiseResolveBlock,
-        reject: @escaping RCTPromiseRejectBlock
+        withResolver resolve: @escaping RCTPromiseResolveBlock,
+        withRejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         MatrixCryptoBridge.destroy()
         resolve(["success": true])
