@@ -502,7 +502,7 @@ impl MatrixCrypto {
 
         if msg_type == 0 {
             // PreKey message: create a new inbound session from our account.
-            let prekey_msg = vodozemac::olm::messages::PreKeyMessage::from_base64(&ciphertext_b64)
+            let prekey_msg = vodozemac::olm::PreKeyMessage::from_base64(&ciphertext_b64)
                 .map_err(|e| CryptoError::DecryptionFailed(
                     format!("Invalid PreKey message: {e}")
                 ))?;
@@ -528,7 +528,7 @@ impl MatrixCrypto {
                 .ok_or_else(|| CryptoError::DecryptionFailed(
                     format!("No Olm session for sender key {sender_identity_key}")
                 ))?;
-            let msg = vodozemac::olm::messages::Message::from_base64(&ciphertext_b64)
+            let msg = vodozemac::olm::Message::from_base64(&ciphertext_b64)
                 .map_err(|e| CryptoError::DecryptionFailed(
                     format!("Invalid Olm Normal message: {e}")
                 ))?;
