@@ -25,13 +25,22 @@
 
 #import <Foundation/Foundation.h>
 
-// Expose the Swift-defined RNMatrixCrypto class to this ObjC++ translation
-// unit. CocoaPods generates this header for every mixed-language pod; the name
-// is the module name (pod name with dashes replaced by underscores) + "-Swift.h".
-// Without this import the compiler can't see the @interface for RNMatrixCrypto
-// and the category declarations below fail with
-//   "cannot find interface declaration for 'RNMatrixCrypto'"
-#import "react_native_matrix_crypto-Swift.h"
+// Forward-declare RNMatrixCrypto so the ObjC++ compiler knows the class exists
+// and can attach a category to it.
+//
+// Why not #import "react_native_matrix_crypto-Swift.h"?
+//   Xcode compiles ObjC/ObjC++ files before the Swift compiler runs in a
+//   mixed-language pod target. At the point this .mm is compiled, the
+//   Swift-generated header is still an empty stub — so the import succeeds
+//   (no file-not-found error) but provides zero declarations, causing
+//   "cannot find interface declaration for 'RNMatrixCrypto'".
+//
+// A minimal @interface declaration here is enough for the category syntax.
+// ObjC method dispatch is fully dynamic, so at runtime the getTurboModule:
+// method will be found on the class that the Swift runtime already registered
+// as RNMatrixCrypto — no full interface required.
+@interface RNMatrixCrypto : NSObject
+@end
 
 // Resolve spec header — try Expo/RN 0.73+ path first, then bare RN CLI path.
 #if __has_include(<ReactCodegen/RNMatrixCryptoSpec/RNMatrixCryptoSpec.h>)
