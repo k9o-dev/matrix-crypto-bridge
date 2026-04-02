@@ -18,7 +18,6 @@
  */
 
 export type {
-  Spec,
   NativeMatrixCryptoInterface,
 } from './NativeMatrixCrypto';
 

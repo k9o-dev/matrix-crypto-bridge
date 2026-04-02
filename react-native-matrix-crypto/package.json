@@ -70,13 +70,5 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  },
-  "codegenConfig": {
-    "name": "RNMatrixCryptoSpec",
-    "type": "modules",
-    "jsSrcsDir": "src",
-    "android": {
-      "javaPackageName": "com.k9o.matrixcrypto"
-    }
   }
 }
