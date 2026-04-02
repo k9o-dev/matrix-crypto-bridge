@@ -473,11 +473,15 @@ public protocol MatrixCryptoProtocol : AnyObject {
     
     func addDevice(device: DeviceInfo) throws 
     
+    func addInboundSession(roomId: String, senderKey: String, sessionKeyBase64: String) throws 
+    
     func cancelVerification(verificationId: String) throws 
     
     func completeVerification(verificationId: String) throws 
     
     func confirmSas(verificationId: String) throws 
+    
+    func createOlmSession(userId: String, deviceId: String, theirIdentityKey: String, theirOneTimeKey: String) throws 
     
     func decryptEvent(roomId: String, encryptedContent: String) throws  -> String
     
@@ -489,6 +493,16 @@ public protocol MatrixCryptoProtocol : AnyObject {
     
     func encryptEvent(roomId: String, eventType: String, content: String) throws  -> String
     
+    func generateOneTimeKeysJson(count: UInt32) throws  -> String
+    
+    func getDeviceKeysJson() throws  -> String
+    
+    func getIdentityKey() throws  -> String
+    
+    func getOutboundSessionId(roomId: String) throws  -> String
+    
+    func getOutboundSessionKey(roomId: String) throws  -> String
+    
     func getRoomEncryptionState(roomId: String) throws  -> RoomEncryptionState
     
     func getSasEmojis(verificationId: String) throws  -> [EmojiSasPair]
@@ -496,6 +510,12 @@ public protocol MatrixCryptoProtocol : AnyObject {
     func getUserDevices(userId: String) throws  -> [DeviceInfo]
     
     func getVerificationState(verificationId: String) throws  -> VerificationState
+    
+    func markKeysAsPublished() throws 
+    
+    func olmDecrypt(senderIdentityKey: String, msgType: UInt32, ciphertextB64: String) throws  -> String
+    
+    func olmEncrypt(userId: String, deviceId: String, plaintext: String) throws  -> String
     
     func startVerification(otherUserId: String, otherDeviceId: String) throws  -> VerificationState
     
@@ -561,6 +581,15 @@ open func addDevice(device: DeviceInfo)throws  {try rustCallWithError(FfiConvert
 }
 }
     
+open func addInboundSession(roomId: String, senderKey: String, sessionKeyBase64: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_add_inbound_session(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),
+        FfiConverterString.lower(senderKey),
+        FfiConverterString.lower(sessionKeyBase64),$0
+    )
+}
+}
+    
 open func cancelVerification(verificationId: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
     uniffi_matrix_crypto_core_fn_method_matrixcrypto_cancel_verification(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
@@ -578,6 +607,16 @@ open func completeVerification(verificationId: String)throws  {try rustCallWithE
 open func confirmSas(verificationId: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
     uniffi_matrix_crypto_core_fn_method_matrixcrypto_confirm_sas(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
+    )
+}
+}
+    
+open func createOlmSession(userId: String, deviceId: String, theirIdentityKey: String, theirOneTimeKey: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_create_olm_session(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),
+        FfiConverterString.lower(deviceId),
+        FfiConverterString.lower(theirIdentityKey),
+        FfiConverterString.lower(theirOneTimeKey),$0
     )
 }
 }
@@ -623,6 +662,44 @@ open func encryptEvent(roomId: String, eventType: String, content: String)throws
 })
 }
     
+open func generateOneTimeKeysJson(count: UInt32)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_generate_one_time_keys_json(self.uniffiClonePointer(),
+        FfiConverterUInt32.lower(count),$0
+    )
+})
+}
+    
+open func getDeviceKeysJson()throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_device_keys_json(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func getIdentityKey()throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_identity_key(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
+open func getOutboundSessionId(roomId: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_outbound_session_id(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),$0
+    )
+})
+}
+    
+open func getOutboundSessionKey(roomId: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_outbound_session_key(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),$0
+    )
+})
+}
+    
 open func getRoomEncryptionState(roomId: String)throws  -> RoomEncryptionState {
     return try  FfiConverterTypeRoomEncryptionState.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
     uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_room_encryption_state(self.uniffiClonePointer(),
@@ -651,6 +728,32 @@ open func getVerificationState(verificationId: String)throws  -> VerificationSta
     return try  FfiConverterTypeVerificationState.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
     uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_verification_state(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
+    )
+})
+}
+    
+open func markKeysAsPublished()throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_mark_keys_as_published(self.uniffiClonePointer(),$0
+    )
+}
+}
+    
+open func olmDecrypt(senderIdentityKey: String, msgType: UInt32, ciphertextB64: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_olm_decrypt(self.uniffiClonePointer(),
+        FfiConverterString.lower(senderIdentityKey),
+        FfiConverterUInt32.lower(msgType),
+        FfiConverterString.lower(ciphertextB64),$0
+    )
+})
+}
+    
+open func olmEncrypt(userId: String, deviceId: String, plaintext: String)throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_olm_encrypt(self.uniffiClonePointer(),
+        FfiConverterString.lower(userId),
+        FfiConverterString.lower(deviceId),
+        FfiConverterString.lower(plaintext),$0
     )
 })
 }
@@ -1425,6 +1528,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_add_device() != 53634) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_add_inbound_session() != 20617) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_cancel_verification() != 46452) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -1432,6 +1538,9 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_confirm_sas() != 3571) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_create_olm_session() != 7305) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_decrypt_event() != 56529) {
@@ -1449,6 +1558,21 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_encrypt_event() != 23966) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_generate_one_time_keys_json() != 43715) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_device_keys_json() != 11573) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_identity_key() != 50070) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_outbound_session_id() != 45476) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_outbound_session_key() != 28424) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_room_encryption_state() != 46073) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -1459,6 +1583,15 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_verification_state() != 46992) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_mark_keys_as_published() != 17831) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_olm_decrypt() != 24771) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_olm_encrypt() != 30196) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_start_verification() != 54514) {
