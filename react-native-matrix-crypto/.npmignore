@@ -1,0 +1,3 @@
+# Override .gitignore for npm/pnpm packaging.
+# The .a static library must be included for iOS builds.
+node_modules
