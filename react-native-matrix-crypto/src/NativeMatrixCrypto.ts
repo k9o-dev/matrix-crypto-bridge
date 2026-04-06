@@ -68,12 +68,15 @@ export interface NativeMatrixCryptoInterface {
   getOutboundSessionKey(roomId: string): Promise<string>;
   getOutboundSessionId(roomId: string): Promise<string>;
   addInboundSession(roomId: string, senderKey: string, sessionKeyBase64: string): Promise<{ success: boolean }>;
+  importInboundSession(roomId: string, senderKey: string, exportedKeyBase64: string): Promise<{ success: boolean }>;
   createOlmSession(userId: string, deviceId: string, theirIdentityKey: string, theirOneTimeKey: string): Promise<{ success: boolean }>;
   olmEncrypt(userId: string, deviceId: string, plaintext: string): Promise<string>;
   olmDecrypt(senderIdentityKey: string, msgType: number, ciphertextB64: string): Promise<string>;
   getDeviceKeysJson(): Promise<string>;
   generateOneTimeKeysJson(count: number): Promise<string>;
   markKeysAsPublished(): Promise<{ success: boolean }>;
+  exportState(): Promise<string>;
+  importState(stateJson: string): Promise<boolean>;
   destroy(): Promise<{ success: boolean }>;
 }
 

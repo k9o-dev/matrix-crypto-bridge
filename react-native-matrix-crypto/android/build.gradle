@@ -35,12 +35,19 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        main {
+            kotlin.srcDirs = ['src/main/kotlin']
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
     }
 
     namespace 'com.matrix.crypto'
@@ -55,6 +62,8 @@ dependencies {
     implementation "com.facebook.react:react-native:${safeExtGet("reactNativeVersion", "0.73.0")}"
     implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet("kotlinVersion", "1.9.20")}"
     implementation 'androidx.core:core:1.12.0'
+    // JNA is required by UniFFI-generated Kotlin bindings for loading the Rust .so
+    implementation 'net.java.dev.jna:jna:5.14.0@aar'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

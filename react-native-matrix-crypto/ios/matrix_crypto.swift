@@ -493,6 +493,8 @@ public protocol MatrixCryptoProtocol : AnyObject {
     
     func encryptEvent(roomId: String, eventType: String, content: String) throws  -> String
     
+    func exportState() throws  -> String
+    
     func generateOneTimeKeysJson(count: UInt32) throws  -> String
     
     func getDeviceKeysJson() throws  -> String
@@ -510,6 +512,10 @@ public protocol MatrixCryptoProtocol : AnyObject {
     func getUserDevices(userId: String) throws  -> [DeviceInfo]
     
     func getVerificationState(verificationId: String) throws  -> VerificationState
+    
+    func importInboundSession(roomId: String, senderKey: String, exportedKeyBase64: String) throws 
+    
+    func importState(stateJson: String) throws  -> Bool
     
     func markKeysAsPublished() throws 
     
@@ -662,6 +668,13 @@ open func encryptEvent(roomId: String, eventType: String, content: String)throws
 })
 }
     
+open func exportState()throws  -> String {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_export_state(self.uniffiClonePointer(),$0
+    )
+})
+}
+    
 open func generateOneTimeKeysJson(count: UInt32)throws  -> String {
     return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
     uniffi_matrix_crypto_core_fn_method_matrixcrypto_generate_one_time_keys_json(self.uniffiClonePointer(),
@@ -728,6 +741,23 @@ open func getVerificationState(verificationId: String)throws  -> VerificationSta
     return try  FfiConverterTypeVerificationState.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
     uniffi_matrix_crypto_core_fn_method_matrixcrypto_get_verification_state(self.uniffiClonePointer(),
         FfiConverterString.lower(verificationId),$0
+    )
+})
+}
+    
+open func importInboundSession(roomId: String, senderKey: String, exportedKeyBase64: String)throws  {try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_import_inbound_session(self.uniffiClonePointer(),
+        FfiConverterString.lower(roomId),
+        FfiConverterString.lower(senderKey),
+        FfiConverterString.lower(exportedKeyBase64),$0
+    )
+}
+}
+    
+open func importState(stateJson: String)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeCryptoError.lift) {
+    uniffi_matrix_crypto_core_fn_method_matrixcrypto_import_state(self.uniffiClonePointer(),
+        FfiConverterString.lower(stateJson),$0
     )
 })
 }
@@ -1558,6 +1588,9 @@ private var initializationResult: InitializationResult {
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_encrypt_event() != 23966) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_export_state() != 4183) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_generate_one_time_keys_json() != 43715) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -1583,6 +1616,12 @@ private var initializationResult: InitializationResult {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_get_verification_state() != 46992) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_import_inbound_session() != 26075) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_import_state() != 12171) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_crypto_core_checksum_method_matrixcrypto_mark_keys_as_published() != 17831) {

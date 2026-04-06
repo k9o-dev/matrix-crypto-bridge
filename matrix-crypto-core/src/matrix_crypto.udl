@@ -131,6 +131,9 @@ interface MatrixCrypto {
     [Throws=CryptoError]
     void add_inbound_session(string room_id, string sender_key, string session_key_base64);
 
+    [Throws=CryptoError]
+    void import_inbound_session(string room_id, string sender_key, string exported_key_base64);
+
     // Olm to-device encryption
     [Throws=CryptoError]
     void create_olm_session(string user_id, string device_id, string their_identity_key, string their_one_time_key);
@@ -150,4 +153,11 @@ interface MatrixCrypto {
 
     [Throws=CryptoError]
     void mark_keys_as_published();
+
+    // State persistence — export / import across app restarts
+    [Throws=CryptoError]
+    string export_state();
+
+    [Throws=CryptoError]
+    boolean import_state(string state_json);
 };

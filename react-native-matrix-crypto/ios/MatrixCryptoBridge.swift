@@ -156,6 +156,18 @@ import Foundation
         )
     }
 
+    @objc public static func importInboundSession(
+        roomId: String,
+        senderKey: String,
+        exportedKeyBase64: String
+    ) throws {
+        try requireInstance().importInboundSession(
+            roomId: roomId,
+            senderKey: senderKey,
+            exportedKeyBase64: exportedKeyBase64
+        )
+    }
+
     @objc public static func createOlmSession(
         userId: String,
         deviceId: String,
@@ -206,6 +218,17 @@ import Foundation
 
     @objc public static func markKeysAsPublished() throws {
         try requireInstance().markKeysAsPublished()
+    }
+
+    // MARK: - State Persistence
+
+    @objc public static func exportState() throws -> String {
+        return try requireInstance().exportState()
+    }
+
+    @objc public static func importState(stateJson: String) throws -> NSNumber {
+        let result = try requireInstance().importState(stateJson: stateJson)
+        return NSNumber(value: result)
     }
 
     // MARK: - Private Helpers

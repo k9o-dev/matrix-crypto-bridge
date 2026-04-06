@@ -1,11 +1,30 @@
 use crate::device::{DeviceInfo, EmojiSASPair, VerificationState, RoomEncryptionState};
 use crate::error::CryptoError;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
-use vodozemac::megolm::{GroupSession, InboundGroupSession, SessionConfig, MegolmMessage};
+use vodozemac::megolm::{ExportedSessionKey, GroupSession, InboundGroupSession, SessionConfig, MegolmMessage};
 use vodozemac::olm::{Account, Session as OlmSession, SessionConfig as OlmSessionConfig};
 use vodozemac::Curve25519PublicKey;
+
+// ---------------------------------------------------------------------------
+// Serialisable snapshot of crypto state for persistence across app restarts.
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize)]
+struct PersistedCryptoState {
+    /// Pickled Olm account (preserves identity keys + OTK state).
+    account: vodozemac::olm::AccountPickle,
+    /// Olm sessions keyed by remote Curve25519 identity key.
+    olm_sessions: HashMap<String, vodozemac::olm::SessionPickle>,
+    /// Maps "userId:deviceId" → Curve25519 identity key.
+    device_to_idkey: HashMap<String, String>,
+    /// Outbound Megolm sessions keyed by room ID.
+    megolm_outbound: HashMap<String, vodozemac::megolm::GroupSessionPickle>,
+    /// Inbound Megolm sessions keyed by session ID.
+    megolm_inbound: HashMap<String, vodozemac::megolm::InboundGroupSessionPickle>,
+}
 
 // ---------------------------------------------------------------------------
 // Combined Megolm session store — one mutex to avoid nested-lock deadlocks.
@@ -36,11 +55,11 @@ impl MegolmSessions {
 pub struct MatrixCrypto {
     user_id: String,
     device_id: String,
-    device_fingerprint: String,
+    device_fingerprint: Mutex<String>,
     /// Ed25519 identity key (base64) for signing.
-    ed25519_key: String,
+    ed25519_key: Mutex<String>,
     /// Curve25519 identity key (base64) for Olm session establishment.
-    curve25519_key: String,
+    curve25519_key: Mutex<String>,
     /// Olm account — holds this device's Ed25519 (signing) and Curve25519
     /// (identity) key pairs.  Wrapped in Mutex so create_inbound_session
     /// (which needs &mut Account) can be called from &self methods.
@@ -48,9 +67,13 @@ pub struct MatrixCrypto {
     /// Megolm session store.
     sessions: Arc<Mutex<MegolmSessions>>,
     /// Olm sessions for to-device message encryption/decryption.
-    /// Keyed by "{user_id}:{device_id}" for outbound sessions, and
-    /// by session_id for inbound sessions from prekey messages.
+    /// All sessions are keyed by the remote device's Curve25519 identity key
+    /// (base64).  This allows both encrypt (after lookup via device_to_idkey)
+    /// and decrypt (direct lookup by sender_identity_key) to find the session.
     olm_sessions: Arc<Mutex<HashMap<String, OlmSession>>>,
+    /// Maps "userId:deviceId" → identity key (base64) so olm_encrypt can
+    /// locate the session stored by identity key.
+    device_to_idkey: Arc<Mutex<HashMap<String, String>>>,
     /// Storage for device verifications
     verifications: Arc<Mutex<HashMap<String, VerificationState>>>,
     /// Storage for device info
@@ -81,12 +104,13 @@ impl MatrixCrypto {
         Ok(MatrixCrypto {
             user_id,
             device_id,
-            device_fingerprint: fingerprint,
-            ed25519_key,
-            curve25519_key,
+            device_fingerprint: Mutex::new(fingerprint),
+            ed25519_key: Mutex::new(ed25519_key),
+            curve25519_key: Mutex::new(curve25519_key),
             olm_account: Arc::new(Mutex::new(olm_account)),
             sessions: Arc::new(Mutex::new(MegolmSessions::new())),
             olm_sessions: Arc::new(Mutex::new(HashMap::new())),
+            device_to_idkey: Arc::new(Mutex::new(HashMap::new())),
             verifications: Arc::new(Mutex::new(HashMap::new())),
             devices: Arc::new(Mutex::new(HashMap::new())),
             rooms: Arc::new(Mutex::new(HashMap::new())),
@@ -95,7 +119,7 @@ impl MatrixCrypto {
 
     /// Get the device fingerprint (Ed25519 public key, base64-encoded)
     pub fn device_fingerprint(&self) -> String {
-        self.device_fingerprint.clone()
+        self.device_fingerprint.lock().unwrap().clone()
     }
 
     /// Get the user ID
@@ -110,7 +134,7 @@ impl MatrixCrypto {
 
     /// Get our Curve25519 identity key (base64) for Olm session establishment.
     pub fn get_identity_key(&self) -> Result<String, CryptoError> {
-        Ok(self.curve25519_key.clone())
+        Ok(self.curve25519_key.lock().unwrap().clone())
     }
 
     /// Get devices for a user
@@ -250,6 +274,29 @@ impl MatrixCrypto {
     /// Encrypt a Matrix event using Megolm (m.megolm.v1.aes-sha2).
     ///
     /// On the first call for a room a new outbound GroupSession is created.
+    /// Create the outbound Megolm session for a room if it doesn't exist yet.
+    ///
+    /// Call this BEFORE `get_outbound_session_key` / `get_outbound_session_id`
+    /// when you need to export the session key at ratchet index 0 (before any
+    /// message is encrypted).  This lets the caller share the key with other
+    /// devices and guarantees they can decrypt every message from index 0.
+    ///
+    /// If the session already exists this is a no-op.
+    pub fn ensure_outbound_session(&self, room_id: String) -> Result<(), CryptoError> {
+        let mut sessions = self.sessions.lock().unwrap();
+        if !sessions.outbound.contains_key(&room_id) {
+            let outbound = GroupSession::new(SessionConfig::version_1());
+            let session_key = outbound.session_key();
+            let session_id = outbound.session_id().to_owned();
+
+            let inbound = InboundGroupSession::new(&session_key, SessionConfig::version_1());
+
+            sessions.inbound.insert(session_id, inbound);
+            sessions.outbound.insert(room_id, outbound);
+        }
+        Ok(())
+    }
+
     /// A matching InboundGroupSession is stored at the same time so that
     /// messages we send can be decrypted by this device (self-decryption).
     ///
@@ -260,29 +307,23 @@ impl MatrixCrypto {
         event_type: String,
         content: String,
     ) -> Result<String, CryptoError> {
+        // Ensure the outbound session exists (creates it if needed).
+        self.ensure_outbound_session(room_id.clone())?;
+
         let mut sessions = self.sessions.lock().unwrap();
-
-        // Create outbound + inbound session pair on first use for this room.
-        if !sessions.outbound.contains_key(&room_id) {
-            let outbound = GroupSession::new(SessionConfig::version_1());
-            let session_key = outbound.session_key();
-            let session_id = outbound.session_id().to_owned();
-
-            // vodozemac 0.7: InboundGroupSession::new(&SessionKey, SessionConfig) -> Self
-            let inbound = InboundGroupSession::new(&session_key, SessionConfig::version_1());
-
-            sessions.inbound.insert(session_id, inbound);
-            sessions.outbound.insert(room_id.clone(), outbound);
-        }
 
         let outbound = sessions.outbound.get_mut(&room_id).unwrap();
 
-        // Matrix Megolm plaintext: a JSON object with `type` and `content`
+        // Matrix Megolm plaintext: a JSON object with `type`, `content`, and
+        // `room_id`.  The spec requires `room_id` in the plaintext so the
+        // recipient can verify the message belongs to the claimed room.
         let plaintext = format!(
-            r#"{{"type":{},"content":{}}}"#,
+            r#"{{"type":{},"content":{},"room_id":{}}}"#,
             serde_json::to_string(&event_type)
                 .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?,
             content,
+            serde_json::to_string(&room_id)
+                .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?,
         );
 
         let msg: MegolmMessage = outbound.encrypt(&plaintext);
@@ -292,7 +333,7 @@ impl MatrixCrypto {
             r#"{{"algorithm":"m.megolm.v1.aes-sha2","ciphertext":"{}","device_id":"{}","sender_key":"{}","session_id":"{}"}}"#,
             msg.to_base64(),
             self.device_id,
-            self.curve25519_key,
+            self.curve25519_key.lock().unwrap(),
             session_id,
         ))
     }
@@ -330,10 +371,24 @@ impl MatrixCrypto {
 
         let mut sessions = self.sessions.lock().unwrap();
 
+        // Collect diagnostic info before the mutable borrow from get_mut
+        let stored_ids: Vec<String> = sessions.inbound.keys()
+            .map(|s| s.chars().take(12).collect::<String>())
+            .collect();
+
         let inbound = sessions.inbound.get_mut(session_id)
-            .ok_or_else(|| CryptoError::DecryptionFailed(
-                format!("No inbound session for session_id {session_id}")
-            ))?;
+            .ok_or_else(|| {
+                eprintln!(
+                    "[RUST:decrypt] No session for {} (have {} sessions: {:?})",
+                    &session_id[..std::cmp::min(12, session_id.len())],
+                    stored_ids.len(),
+                    stored_ids,
+                );
+                CryptoError::DecryptionFailed(
+                    format!("No inbound session for session_id {} (have {} sessions: {:?})",
+                        session_id, stored_ids.len(), stored_ids)
+                )
+            })?;
 
         let msg = MegolmMessage::from_base64(ciphertext)
             .map_err(|e| CryptoError::DecryptionFailed(
@@ -403,13 +458,44 @@ impl MatrixCrypto {
         session_key_base64: String,
     ) -> Result<(), CryptoError> {
         // SessionKey deserialises from a base64 JSON string.
-        let key_value = serde_json::Value::String(session_key_base64);
+        let key_value = serde_json::Value::String(session_key_base64.clone());
         let session_key: vodozemac::megolm::SessionKey = serde_json::from_value(key_value)
             .map_err(|e| CryptoError::DecryptionFailed(
                 format!("Invalid session key base64: {e}")
             ))?;
         let inbound = InboundGroupSession::new(&session_key, SessionConfig::version_1());
         let session_id = inbound.session_id().to_owned();
+        eprintln!("[RUST:addInbound] Created session, id={}, room={}, keyLen={}", session_id, room_id, session_key_base64.len());
+        let mut sessions = self.sessions.lock().unwrap();
+        sessions.inbound.insert(session_id.clone(), inbound);
+        eprintln!("[RUST:addInbound] Stored. Total inbound sessions: {}", sessions.inbound.len());
+        Ok(())
+    }
+
+    /// Import an inbound Megolm session from a forwarded/exported session key.
+    ///
+    /// Unlike `add_inbound_session` which takes a `SessionKey` (from the
+    /// original `m.room_key`), this takes an `ExportedSessionKey` (from
+    /// `m.forwarded_room_key` or key backup). The exported format uses a
+    /// different binary prefix and may start at a ratchet index > 0.
+    pub fn import_inbound_session(
+        &self,
+        room_id: String,
+        _sender_key: String,
+        exported_key_base64: String,
+    ) -> Result<(), CryptoError> {
+        let key_value = serde_json::Value::String(exported_key_base64);
+        let exported_key: ExportedSessionKey = serde_json::from_value(key_value)
+            .map_err(|e| CryptoError::DecryptionFailed(
+                format!("Invalid exported session key base64: {e}")
+            ))?;
+        let inbound = InboundGroupSession::import(&exported_key, SessionConfig::version_1());
+        let session_id = inbound.session_id().to_owned();
+        tracing::info!(
+            room_id = %room_id,
+            session_id = %session_id,
+            "Imported forwarded/exported inbound Megolm session"
+        );
         let mut sessions = self.sessions.lock().unwrap();
         sessions.inbound.insert(session_id, inbound);
         Ok(())
@@ -447,8 +533,26 @@ impl MatrixCrypto {
                 one_time_key,
             )
         };
-        let key = format!("{}:{}", user_id, device_id);
-        self.olm_sessions.lock().unwrap().insert(key, session);
+        // DEBUG: log the exact key we're storing the session under
+        eprintln!(
+            "[OLM-DEBUG] create_olm_session: storing session for {}:{} under idkey='{}'",
+            user_id, device_id, their_identity_key
+        );
+        // Store session by identity key so olmDecrypt can find it
+        self.olm_sessions.lock().unwrap().insert(their_identity_key.clone(), session);
+        // Map userId:deviceId → identity key so olmEncrypt can find it
+        let device_key = format!("{}:{}", user_id, device_id);
+        self.device_to_idkey.lock().unwrap().insert(device_key.clone(), their_identity_key.clone());
+        // DEBUG: dump all session keys after insert
+        let all_keys: Vec<String> = self.olm_sessions.lock().unwrap().keys().cloned().collect();
+        eprintln!(
+            "[OLM-DEBUG] create_olm_session: all session keys after insert: {:?}",
+            all_keys
+        );
+        eprintln!(
+            "[OLM-DEBUG] create_olm_session: device_to_idkey[{}] = {}",
+            device_key, their_identity_key
+        );
         Ok(())
     }
 
@@ -463,11 +567,17 @@ impl MatrixCrypto {
         device_id: String,
         plaintext: String,
     ) -> Result<String, CryptoError> {
-        let key = format!("{}:{}", user_id, device_id);
-        let mut olm_sessions = self.olm_sessions.lock().unwrap();
-        let session = olm_sessions.get_mut(&key)
+        let device_key = format!("{}:{}", user_id, device_id);
+        let idkey = self.device_to_idkey.lock().unwrap()
+            .get(&device_key)
+            .cloned()
             .ok_or_else(|| CryptoError::EncryptionFailed(
-                format!("No Olm session for {key} — call create_olm_session first")
+                format!("No Olm session for {device_key} — call create_olm_session first")
+            ))?;
+        let mut olm_sessions = self.olm_sessions.lock().unwrap();
+        let session = olm_sessions.get_mut(&idkey)
+            .ok_or_else(|| CryptoError::EncryptionFailed(
+                format!("No Olm session for identity key {idkey}")
             ))?;
         let message = session.encrypt(plaintext.as_bytes());
         let (msg_type, body) = match message {
@@ -495,32 +605,68 @@ impl MatrixCrypto {
     ) -> Result<String, CryptoError> {
         use vodozemac::olm::OlmMessage;
 
+        // DEBUG: log what we're looking up and what keys exist
+        let all_keys: Vec<String> = self.olm_sessions.lock().unwrap().keys().cloned().collect();
+        eprintln!(
+            "[OLM-DEBUG] olm_decrypt: looking for sender_identity_key='{}', msg_type={}, all session keys: {:?}",
+            sender_identity_key, msg_type, all_keys
+        );
+
         let sender_key = Curve25519PublicKey::from_base64(&sender_identity_key)
             .map_err(|e| CryptoError::DecryptionFailed(
                 format!("Invalid sender identity key: {e}")
             ))?;
 
         if msg_type == 0 {
-            // PreKey message: create a new inbound session from our account.
+            // PreKey message: try to create a new inbound session from our account.
             let prekey_msg = vodozemac::olm::PreKeyMessage::from_base64(&ciphertext_b64)
                 .map_err(|e| CryptoError::DecryptionFailed(
                     format!("Invalid PreKey message: {e}")
                 ))?;
             let mut account = self.olm_account.lock().unwrap();
-            let result = account
-                .create_inbound_session(sender_key, &prekey_msg)
-                .map_err(|e| CryptoError::DecryptionFailed(
-                    format!("Failed to create inbound Olm session: {e}")
-                ))?;
-            // Store the new inbound session keyed by the sender identity key
-            // so future normal messages from this device can be decrypted.
-            drop(account);
-            self.olm_sessions.lock().unwrap()
-                .insert(sender_identity_key, result.session);
-            String::from_utf8(result.plaintext)
-                .map_err(|_| CryptoError::DecryptionFailed(
-                    "Olm plaintext is not valid UTF-8".to_string()
-                ))
+            match account.create_inbound_session(sender_key, &prekey_msg) {
+                Ok(result) => {
+                    // Store the new inbound session keyed by the sender identity key
+                    // so future normal messages from this device can be decrypted.
+                    drop(account);
+                    eprintln!(
+                        "[OLM-DEBUG] olm_decrypt type 0: created inbound session, storing under idkey='{}'",
+                        sender_identity_key
+                    );
+                    self.olm_sessions.lock().unwrap()
+                        .insert(sender_identity_key, result.session);
+                    String::from_utf8(result.plaintext)
+                        .map_err(|_| CryptoError::DecryptionFailed(
+                            "Olm plaintext is not valid UTF-8".to_string()
+                        ))
+                }
+                Err(e) => {
+                    // Unknown OTK — the sender may have created a new session
+                    // using a stale OTK.  Fallback: try decrypting with our
+                    // existing session for this sender (vodozemac's Session::decrypt
+                    // extracts the inner Normal message from a PreKey envelope).
+                    drop(account);
+                    let mut olm_sessions = self.olm_sessions.lock().unwrap();
+                    if let Some(session) = olm_sessions.get_mut(&sender_identity_key) {
+                        let olm_msg = OlmMessage::PreKey(prekey_msg);
+                        match session.decrypt(&olm_msg) {
+                            Ok(plaintext) => {
+                                String::from_utf8(plaintext)
+                                    .map_err(|_| CryptoError::DecryptionFailed(
+                                        "Olm plaintext is not valid UTF-8".to_string()
+                                    ))
+                            }
+                            Err(e2) => Err(CryptoError::DecryptionFailed(
+                                format!("New session failed ({e}); existing session also failed ({e2})")
+                            ))
+                        }
+                    } else {
+                        Err(CryptoError::DecryptionFailed(
+                            format!("Failed to create inbound Olm session: {e} (no existing session to fall back on)")
+                        ))
+                    }
+                }
+            }
         } else {
             // Normal message: look up the existing inbound session by sender key.
             let mut olm_sessions = self.olm_sessions.lock().unwrap();
@@ -616,9 +762,11 @@ impl MatrixCrypto {
         let otks = account.one_time_keys();
         let mut result: std::collections::BTreeMap<String, serde_json::Value> = std::collections::BTreeMap::new();
 
-        // KeyId does not implement Display — use enumerate() for the key ID string.
-        // Any unique opaque string is valid for Matrix OTK key IDs.
-        for (idx, (_, curve25519_key)) in otks.iter().enumerate() {
+        // Use vodozemac's KeyId (a monotonically-increasing u64, base64-encoded)
+        // as the OTK identifier.  Previously we used the enumerate() index which
+        // restarted at 0001 for every batch, causing "already exists" errors on
+        // the homeserver when uploading a second batch.
+        for (key_id, curve25519_key) in otks.iter() {
             let key_b64 = curve25519_key.to_base64();
 
             // Canonical JSON for the key object (sorted single-key object)
@@ -636,9 +784,9 @@ impl MatrixCrypto {
                 }
             });
 
-            // Format key ID as a zero-padded counter (e.g. "signed_curve25519:0001").
-            // The exact format doesn't matter — the homeserver treats OTK IDs as opaque.
-            result.insert(format!("signed_curve25519:{:04}", idx + 1), signed_key);
+            // The homeserver treats OTK IDs as opaque strings.  Using vodozemac's
+            // internal KeyId guarantees uniqueness across the account's lifetime.
+            result.insert(format!("signed_curve25519:{}", key_id.to_base64()), signed_key);
         }
 
         serde_json::to_string(&result)
@@ -653,5 +801,116 @@ impl MatrixCrypto {
         let mut account = self.olm_account.lock().unwrap();
         account.mark_keys_as_published();
         Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // State persistence — export / import
+    // -----------------------------------------------------------------------
+
+    /// Serialise the full crypto state to a JSON string so it can be persisted
+    /// by the host application (e.g. AsyncStorage, filesystem).
+    ///
+    /// Includes: Olm account, Olm sessions, device→idkey map,
+    /// Megolm outbound + inbound sessions.
+    pub fn export_state(&self) -> Result<String, CryptoError> {
+        let account = self.olm_account.lock().unwrap();
+        let olm_sessions_guard = self.olm_sessions.lock().unwrap();
+        let device_map = self.device_to_idkey.lock().unwrap();
+        let megolm = self.sessions.lock().unwrap();
+
+        let mut olm_pickles: HashMap<String, vodozemac::olm::SessionPickle> = HashMap::new();
+        for (key, session) in olm_sessions_guard.iter() {
+            olm_pickles.insert(key.clone(), session.pickle());
+        }
+
+        let mut outbound_pickles: HashMap<String, vodozemac::megolm::GroupSessionPickle> = HashMap::new();
+        for (room_id, session) in megolm.outbound.iter() {
+            outbound_pickles.insert(room_id.clone(), session.pickle());
+        }
+
+        let mut inbound_pickles: HashMap<String, vodozemac::megolm::InboundGroupSessionPickle> = HashMap::new();
+        for (session_id, session) in megolm.inbound.iter() {
+            inbound_pickles.insert(session_id.clone(), session.pickle());
+        }
+
+        let state = PersistedCryptoState {
+            account: account.pickle(),
+            olm_sessions: olm_pickles,
+            device_to_idkey: device_map.clone(),
+            megolm_outbound: outbound_pickles,
+            megolm_inbound: inbound_pickles,
+        };
+
+        serde_json::to_string(&state)
+            .map_err(|e| CryptoError::StorageError(e.to_string()))
+    }
+
+    /// Restore crypto state from a previously exported JSON string.
+    ///
+    /// Replaces the current Olm account, all Olm sessions, device→idkey map,
+    /// and all Megolm sessions.  Also updates the derived identity keys so
+    /// subsequent calls to `get_identity_key()` / `device_fingerprint()` are
+    /// consistent with the restored account.
+    ///
+    /// Returns `true` if the state was restored, `false` if `state_json` is
+    /// empty (caller should proceed with the fresh account created by `new()`).
+    pub fn import_state(&self, state_json: String) -> Result<bool, CryptoError> {
+        if state_json.is_empty() {
+            return Ok(false);
+        }
+
+        let state: PersistedCryptoState = serde_json::from_str(&state_json)
+            .map_err(|e| CryptoError::StorageError(
+                format!("Failed to parse persisted state: {e}")
+            ))?;
+
+        // Restore the Olm account and update derived identity keys.
+        let restored_account = Account::from_pickle(state.account);
+        let identity_keys = restored_account.identity_keys();
+        let ed25519_b64 = identity_keys.ed25519.to_base64();
+        let curve25519_b64 = identity_keys.curve25519.to_base64();
+
+        *self.ed25519_key.lock().unwrap() = ed25519_b64.clone();
+        *self.curve25519_key.lock().unwrap() = curve25519_b64.clone();
+        *self.device_fingerprint.lock().unwrap() = ed25519_b64.clone();
+
+        *self.olm_account.lock().unwrap() = restored_account;
+
+        tracing::info!(
+            "[STATE] Restored Olm account — ed25519={}, curve25519={}",
+            &ed25519_b64[..12], &curve25519_b64[..12]
+        );
+
+        // Restore Olm sessions.
+        let mut olm_sessions = self.olm_sessions.lock().unwrap();
+        olm_sessions.clear();
+        for (key, pickle) in state.olm_sessions {
+            let session = OlmSession::from_pickle(pickle);
+            olm_sessions.insert(key, session);
+        }
+        tracing::info!("[STATE] Restored {} Olm session(s)", olm_sessions.len());
+
+        // Restore device→idkey mapping.
+        let mut device_map = self.device_to_idkey.lock().unwrap();
+        *device_map = state.device_to_idkey;
+
+        // Restore Megolm sessions.
+        let mut megolm = self.sessions.lock().unwrap();
+        megolm.outbound.clear();
+        for (room_id, pickle) in state.megolm_outbound {
+            let session = GroupSession::from_pickle(pickle);
+            megolm.outbound.insert(room_id, session);
+        }
+        megolm.inbound.clear();
+        for (session_id, pickle) in state.megolm_inbound {
+            let session = InboundGroupSession::from_pickle(pickle);
+            megolm.inbound.insert(session_id, session);
+        }
+        tracing::info!(
+            "[STATE] Restored {} outbound + {} inbound Megolm session(s)",
+            megolm.outbound.len(), megolm.inbound.len()
+        );
+
+        Ok(true)
     }
 }

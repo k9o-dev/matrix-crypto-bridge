@@ -103,6 +103,12 @@ RCT_EXTERN_METHOD(addInboundSession:(NSString *)roomId
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(importInboundSession:(NSString *)roomId
+                  senderKey:(NSString *)senderKey
+                  exportedKeyBase64:(NSString *)exportedKeyBase64
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(createOlmSession:(NSString *)userId
                   deviceId:(NSString *)deviceId
                   theirIdentityKey:(NSString *)theirIdentityKey
@@ -135,6 +141,14 @@ RCT_EXTERN_METHOD(generateOneTimeKeysJson:(nonnull NSNumber *)count
                   reject:(RCTPromiseRejectBlock)reject)
 
 RCT_EXTERN_METHOD(markKeysAsPublished:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+// State Persistence
+RCT_EXTERN_METHOD(exportState:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+
+RCT_EXTERN_METHOD(importState:(NSString *)stateJson
+                  resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 
 @end
