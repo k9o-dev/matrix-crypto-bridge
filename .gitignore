@@ -56,3 +56,6 @@ matrix-crypto-android/generated/
 # Allow Objective-C bridge files in React Native packages
 !react-native-matrix-crypto/ios/*.m
 
+# Allow pre-built Android .so libraries shipped in the React Native package
+!react-native-matrix-crypto/android/src/main/jniLibs/**/*.so
+

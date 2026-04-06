@@ -109,10 +109,16 @@ jobs:
         run: |
           echo "Checking for Android libraries..."
           find dist/android -name "*.so" -exec ls -lh {} \;
+          # Verify the correct library name is produced
+          SO_COUNT=$(find dist/android -name "libuniffi_matrix_crypto.so" | wc -l)
+          echo "Found $SO_COUNT libuniffi_matrix_crypto.so files"
+          if [ "$SO_COUNT" -lt 3 ]; then
+            echo "ERROR: Expected 3 .so files (arm64, armv7, x86_64), found $SO_COUNT"
+            exit 1
+          fi
 
       - name: Generate Kotlin bindings
         run: ./build-scripts/build-workspace.sh kotlin
-        continue-on-error: true
 
       - name: Upload Android artifacts
         if: success()
@@ -175,26 +181,50 @@ jobs:
           echo "Distribution contents:"
           find dist -type f -exec ls -lh {} \;
 
-      - name: Copy Swift bindings and bridge files into dist archive
+      - name: Copy bindings and bridge files into dist archive
         run: |
           # 1. UniFFI-generated Swift bindings -> ios/bindings/
+          #    Use CI-generated bindings from dist/swift/ (NOT from committed files,
+          #    which may be stale and cause UniFFI contract version mismatch / SIGILL crash).
           mkdir -p dist/ios/bindings
-          cp react-native-matrix-crypto/ios/matrix_crypto.swift dist/ios/bindings/
-          cp react-native-matrix-crypto/ios/matrix_cryptoFFI.h dist/ios/bindings/
-          cp react-native-matrix-crypto/ios/matrix_cryptoFFI.modulemap dist/ios/bindings/
-          echo "Swift bindings copied to dist/ios/bindings/:"
+          for f in matrix_crypto.swift matrix_cryptoFFI.h matrix_cryptoFFI.modulemap; do
+            if [ -f "dist/swift/$f" ]; then
+              cp "dist/swift/$f" "dist/ios/bindings/$f"
+              echo "✓ Copied CI-generated $f from dist/swift/"
+            else
+              echo "⚠ $f not found in dist/swift/ — falling back to committed file"
+              [ -f "react-native-matrix-crypto/ios/$f" ] && cp "react-native-matrix-crypto/ios/$f" "dist/ios/bindings/$f"
+            fi
+          done
+          echo "Swift bindings in dist/ios/bindings/:"
           ls -lh dist/ios/bindings/
 
           # 2. React Native bridge files -> ios/bridge/
           # These are the files that register RNMatrixCrypto with React Native's NativeModules.
-          # Without them in the archive the podspec cannot compile the native module and
-          # NativeModules.RNMatrixCrypto will be undefined at runtime.
           mkdir -p dist/ios/bridge
           cp react-native-matrix-crypto/ios/MatrixCryptoBridge.swift dist/ios/bridge/
           cp react-native-matrix-crypto/ios/RNMatrixCryptoModule.swift dist/ios/bridge/
           cp react-native-matrix-crypto/ios/RNMatrixCrypto.m dist/ios/bridge/
           echo "Bridge files copied to dist/ios/bridge/:"
           ls -lh dist/ios/bridge/
+
+          # 3. Android: Kotlin bindings and bridge files -> android/
+          #    Use CI-generated Kotlin bindings from dist/kotlin/ for version consistency.
+          mkdir -p dist/android/kotlin dist/android/bridge
+          KOTLIN_SRC="dist/kotlin/com/matrix/crypto/matrix_crypto.kt"
+          if [ -f "$KOTLIN_SRC" ]; then
+            cp "$KOTLIN_SRC" dist/android/kotlin/matrix_crypto.kt
+            echo "✓ Copied CI-generated Kotlin bindings"
+          else
+            echo "⚠ Kotlin bindings not found in dist/kotlin/"
+          fi
+          # Copy Android bridge files (committed, not generated)
+          for f in RNMatrixCrypto.kt RNMatrixCryptoPackage.kt; do
+            SRC="react-native-matrix-crypto/android/src/main/kotlin/com/matrix/crypto/$f"
+            [ -f "$SRC" ] && cp "$SRC" dist/android/bridge/
+          done
+          echo "Android files in dist/android/:"
+          find dist/android -type f -exec ls -lh {} \;
 
       - name: Create distribution archive
         run: |
@@ -379,12 +409,53 @@ jobs:
           echo "UniFFI contract version in package:"
           grep "bindings_contract_version" react-native-matrix-crypto/ios/matrix_crypto.swift | head -1
 
+      - name: Inject Android .so libraries and Kotlin bindings into npm package
+        run: |
+          # 1. Android shared libraries — required for Android runtime.
+          #    The .so must be named libuniffi_matrix_crypto.so to match the
+          #    UniFFI-generated Kotlin bindings' findLibraryName() lookup.
+          ANDROID_DIR="dist-extracted/android/lib"
+          JNILIBS="react-native-matrix-crypto/android/src/main/jniLibs"
+
+          declare -A ABI_MAP=(
+            ["aarch64-linux-android"]="arm64-v8a"
+            ["armv7-linux-androideabi"]="armeabi-v7a"
+            ["x86_64-linux-android"]="x86_64"
+          )
+
+          for rust_target in "${!ABI_MAP[@]}"; do
+            abi="${ABI_MAP[$rust_target]}"
+            src="$ANDROID_DIR/$rust_target/libuniffi_matrix_crypto.so"
+            dst="$JNILIBS/$abi/"
+            mkdir -p "$dst"
+            if [ -f "$src" ]; then
+              cp "$src" "$dst/libuniffi_matrix_crypto.so"
+              echo "✓ Injected libuniffi_matrix_crypto.so for $abi ($(du -h "$src" | cut -f1))"
+            else
+              echo "ERROR: $src not found. Android build may have failed."
+              exit 1
+            fi
+          done
+
+          # 2. Kotlin bindings — MUST come from the same CI build as the .so.
+          #    Using stale bindings causes UniFFI contract version mismatch at runtime.
+          KOTLIN_SRC="dist-extracted/kotlin/com/matrix/crypto/matrix_crypto.kt"
+          KOTLIN_DST="react-native-matrix-crypto/android/src/main/kotlin/com/matrix/crypto/"
+          mkdir -p "$KOTLIN_DST"
+          if [ -f "$KOTLIN_SRC" ]; then
+            cp "$KOTLIN_SRC" "$KOTLIN_DST/matrix_crypto.kt"
+            echo "✓ Injected CI-generated Kotlin bindings"
+          else
+            echo "ERROR: Kotlin bindings not found at $KOTLIN_SRC"
+            exit 1
+          fi
+
       - name: Install dependencies
         run: cd react-native-matrix-crypto && npm install
 
       - name: Verify package contents
         run: |
-          echo "npm package ios/ contents:"
+          echo "=== iOS ==="
           ls -lh react-native-matrix-crypto/ios/
           test -f react-native-matrix-crypto/ios/libmatrix_crypto_ios.a \
             && echo "✓ libmatrix_crypto_ios.a present" \
@@ -392,6 +463,18 @@ jobs:
           test -f react-native-matrix-crypto/ios/matrix_crypto.swift \
             && echo "✓ matrix_crypto.swift present" \
             || (echo "✗ matrix_crypto.swift MISSING" && exit 1)
+
+          echo ""
+          echo "=== Android ==="
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            SO="react-native-matrix-crypto/android/src/main/jniLibs/$abi/libuniffi_matrix_crypto.so"
+            test -f "$SO" \
+              && echo "✓ $abi/libuniffi_matrix_crypto.so present ($(du -h "$SO" | cut -f1))" \
+              || (echo "✗ $abi/libuniffi_matrix_crypto.so MISSING" && exit 1)
+          done
+          test -f react-native-matrix-crypto/android/src/main/kotlin/com/matrix/crypto/matrix_crypto.kt \
+            && echo "✓ Kotlin bindings present" \
+            || (echo "✗ Kotlin bindings MISSING" && exit 1)
 
       - name: Publish to NPM
         run: |

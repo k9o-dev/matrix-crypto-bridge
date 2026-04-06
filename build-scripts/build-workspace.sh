@@ -269,13 +269,15 @@ build_android() {
             print_success "Build succeeded for $target"
             
             # Copy the dynamic library (.so file)
-            local lib_file="$WORKSPACE_TARGET/$target/release/libmatrix_crypto_android.so"
+            # The lib is named libuniffi_matrix_crypto.so (set via [lib] name in Cargo.toml)
+            # to match what UniFFI-generated Kotlin bindings expect at runtime.
+            local lib_file="$WORKSPACE_TARGET/$target/release/libuniffi_matrix_crypto.so"
             if verify_artifact "$lib_file" "Android shared library ($target)"; then
                 # Create ABI-specific directory
                 local abi_dir="$android_output_dir/lib/$target"
                 mkdir -p "$abi_dir"
-                cp "$lib_file" "$abi_dir/libmatrix_crypto_android.so"
-                print_success "Copied to $abi_dir/libmatrix_crypto_android.so"
+                cp "$lib_file" "$abi_dir/libuniffi_matrix_crypto.so"
+                print_success "Copied to $abi_dir/libuniffi_matrix_crypto.so"
             else
                 print_error "Failed to find library for $target"
                 return 1
@@ -293,11 +295,11 @@ build_android() {
     mkdir -p "$PACKAGE_DIR/android/src/main/jniLibs/armeabi-v7a"
     mkdir -p "$PACKAGE_DIR/android/src/main/jniLibs/x86_64"
     
-    cp "$android_output_dir/lib/aarch64-linux-android/libmatrix_crypto_android.so" \
+    cp "$android_output_dir/lib/aarch64-linux-android/libuniffi_matrix_crypto.so" \
        "$PACKAGE_DIR/android/src/main/jniLibs/arm64-v8a/"
-    cp "$android_output_dir/lib/armv7-linux-androideabi/libmatrix_crypto_android.so" \
+    cp "$android_output_dir/lib/armv7-linux-androideabi/libuniffi_matrix_crypto.so" \
        "$PACKAGE_DIR/android/src/main/jniLibs/armeabi-v7a/"
-    cp "$android_output_dir/lib/x86_64-linux-android/libmatrix_crypto_android.so" \
+    cp "$android_output_dir/lib/x86_64-linux-android/libuniffi_matrix_crypto.so" \
        "$PACKAGE_DIR/android/src/main/jniLibs/x86_64/"
     
     print_success "Copied to react-native package"
@@ -358,30 +360,31 @@ generate_kotlin_bindings() {
     local kotlin_output_dir="$DIST_DIR/kotlin"
     mkdir -p "$kotlin_output_dir"
     
-    print_subsection "Generating Kotlin bindings..."
-    
-    # Use uniffi-bindgen to generate Kotlin code
-    if command_exists uniffi-bindgen; then
-        cd "$PROJECT_ROOT"
-        uniffi-bindgen generate \
-            --language kotlin \
-            matrix-crypto-core/src/matrix_crypto.udl \
-            --out-dir "$kotlin_output_dir"
-        
-        if [ -f "$kotlin_output_dir/matrix_crypto.kt" ]; then
-            print_success "Generated Kotlin bindings"
-            
-            # Copy to package
-            mkdir -p "$PACKAGE_DIR/android/bindings"
-            cp "$kotlin_output_dir/matrix_crypto.kt" "$PACKAGE_DIR/android/bindings/"
-            print_success "Copied Kotlin bindings to package"
-        else
-            print_warning "Kotlin bindings may not have been generated correctly"
-        fi
+    print_subsection "Generating Kotlin bindings using workspace-local uniffi-bindgen..."
+
+    # IMPORTANT: Always use 'cargo run' rather than a globally-installed uniffi-bindgen.
+    # The workspace pins uniffi to a specific version (see Cargo.lock). A globally-
+    # installed uniffi-bindgen may be a different version and will generate bindings
+    # with a different contract version, causing a crash at runtime.
+    cd "$PROJECT_ROOT"
+    cargo run -p matrix-crypto-core --bin uniffi-bindgen -- generate \
+        --language kotlin \
+        matrix-crypto-core/src/matrix_crypto.udl \
+        --out-dir "$kotlin_output_dir"
+
+    if [ -f "$kotlin_output_dir/com/matrix/crypto/matrix_crypto.kt" ]; then
+        print_success "Generated Kotlin bindings"
+
+        # Copy to the npm package's android source directory so autolinking picks it up.
+        mkdir -p "$PACKAGE_DIR/android/src/main/kotlin/com/matrix/crypto"
+        cp "$kotlin_output_dir/com/matrix/crypto/matrix_crypto.kt" \
+           "$PACKAGE_DIR/android/src/main/kotlin/com/matrix/crypto/matrix_crypto.kt"
+        print_success "Copied Kotlin bindings to npm package android/"
     else
-        print_warning "uniffi-bindgen not found - skipping Kotlin bindings generation"
+        print_error "Kotlin bindings generation failed — matrix_crypto.kt not produced"
+        return 1
     fi
-    
+
     return 0
 }
 
@@ -460,10 +463,10 @@ EOF
     
     if [ -d "$DIST_DIR/android/lib" ]; then
         for abi in aarch64-linux-android armv7-linux-androideabi x86_64-linux-android; do
-            if [ -f "$DIST_DIR/android/lib/$abi/libmatrix_crypto_android.so" ]; then
-                local size=$(du -h "$DIST_DIR/android/lib/$abi/libmatrix_crypto_android.so" | cut -f1)
+            if [ -f "$DIST_DIR/android/lib/$abi/libuniffi_matrix_crypto.so" ]; then
+                local size=$(du -h "$DIST_DIR/android/lib/$abi/libuniffi_matrix_crypto.so" | cut -f1)
                 echo "### $abi" >> "$report_file"
-                echo "- **File**: libmatrix_crypto_android.so" >> "$report_file"
+                echo "- **File**: libuniffi_matrix_crypto.so" >> "$report_file"
                 echo "- **Size**: $size" >> "$report_file"
                 echo "" >> "$report_file"
             fi
